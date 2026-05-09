@@ -1,0 +1,26 @@
+{
+  "expo": {
+    "name": "ModaVerse",
+    "slug": "ModaVerse",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "assetBundlePatterns": ["**/*"],
+    "ios": {
+      "bundleIdentifier": "com.yusufhrsn12.modaverse"
+    },
+    "android": {
+      "package": "com.yusufhrsn12.modaverse"
+    },
+    "plugins": [
+      "expo-image-picker",
+      "expo-camera",
+      "expo-font"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e387e891-37bd-4b12-9955-b6ab366b103b"
+      }
+    }
+  }
+}
