@@ -1,41 +1,24 @@
+// 📁 src/screens/CategoriesScreen.js - LÜKS MİNİMALİST VERSİYON
 import React, { useState, useEffect, useCallback } from 'react';
-import { 
-  View, 
-  FlatList, 
-  Alert, 
-  StyleSheet, 
-  SafeAreaView, 
+import {
+  View,
+  FlatList,
+  Alert,
+  StyleSheet,
+  SafeAreaView,
   StatusBar,
   Dimensions,
   TouchableOpacity,
-  Image
+  Image,
+  ActivityIndicator,
+  Platform
 } from 'react-native';
-import { Appbar, Card, Button, Text, ActivityIndicator, Chip } from 'react-native-paper';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS, TYPOGRAPHY, SIZES } from '../constants/Theme';
 
-// 📏 Ekran boyutları
 const { width, height } = Dimensions.get('window');
 
-// 🎨 Renk paleti (App.js ile uyumlu - cognac düzeltildi)
-const COLORS = {
-  white: '#FFFFFF',
-  ivory: '#F9F6F2',
-  paper: '#F5F3EF',
-  cloud: '#F0F0F0',
-  mist: '#E8E8E8',
-  ash: '#888888',
-  charcoal: '#222222',
-  noir: '#000000',
-  cognac: '#8C7853',  // ✅ DÜZELTİLDİ
-  porcelain: '#FAFAFA',
-  accent: '#8C7853',
-  success: '#4CAF50',
-  warning: '#FF9800',
-  error: '#F44336',
-  like: '#E91E63',
-};
-
-// ✅ MOCK API
+// MOCK API
 const wardrobeAPI = {
   getCategories: async () => {
     return {
@@ -54,23 +37,15 @@ const wardrobeAPI = {
   }
 };
 
-// ✅ Global stiller
-const globalStyles = {
-  container: { flex: 1, backgroundColor: COLORS.white },
-  centerContainer: { flex: 1, justifyContent: 'center', alignItems: 'center' },
-  card: { marginHorizontal: 16, marginBottom: 12, borderRadius: 8 },
-  listContainer: { paddingTop: 16, paddingBottom: 32 },
-};
-
 // Kategori görsel eşleştirmeleri
 const categoryImages = {
-  'Elbise': 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=100',
-  'Pantolon': 'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=100',
-  'Ceket': 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=100',
-  'Ayakkabı': 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=100',
-  'Aksesuar': 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=100',
-  'Tişört': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=100',
-  'Etek': 'https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=100',
+  'Elbise': 'https://images.unsplash.com/photo-1594633312681-425c7b97ccd1?w=200',
+  'Pantolon': 'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=200',
+  'Ceket': 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=200',
+  'Ayakkabı': 'https://images.unsplash.com/photo-1549298916-b41d501d3772?w=200',
+  'Aksesuar': 'https://images.unsplash.com/photo-1584917865442-de89df76afd3?w=200',
+  'Tişört': 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200',
+  'Etek': 'https://images.unsplash.com/photo-1583496661160-fb5886a0aaaa?w=200',
 };
 
 const CategoriesScreen = ({ navigation }) => {
@@ -95,7 +70,7 @@ const CategoriesScreen = ({ navigation }) => {
       
       categoriesData = categoriesData.map(cat => ({
         ...cat,
-        image: categoryImages[cat.name] || 'https://via.placeholder.com/100',
+        image: categoryImages[cat.name] || 'https://via.placeholder.com/200',
         count: cat.count || Math.floor(Math.random() * 20) + 5,
       }));
       
@@ -119,121 +94,111 @@ const CategoriesScreen = ({ navigation }) => {
   }, [loadCategories]);
 
   const handleCategoryPress = useCallback((category) => {
-    Alert.alert('Kategori', `${category.name} kategorisi açılıyor...`);
+    navigation.navigate('CategoryProducts', { categoryId: category.id, categoryName: category.name });
+  }, [navigation]);
+
+  const handleFavoritePress = useCallback((category) => {
+    Alert.alert('Favori', `${category.name} kategorisi favorilere eklendi.`);
   }, []);
 
   const renderCategory = useCallback(({ item }) => (
-    <TouchableOpacity 
-      activeOpacity={0.7}
-      onPress={() => handleCategoryPress(item)}
-    >
-      <Card style={[globalStyles.card, styles.card]}>
-        <Card.Content style={styles.cardContent}>
-          <Image 
-            source={{ uri: item.image }} 
-            style={styles.categoryImage}
-          />
+    <View style={styles.card}>
+      <TouchableOpacity 
+        activeOpacity={0.7}
+        onPress={() => handleCategoryPress(item)}
+      >
+        <View style={styles.cardContent}>
+          <Image source={{ uri: item.image }} style={styles.categoryImage} />
           
           <View style={styles.categoryInfo}>
-            <Text style={styles.categoryName}>
-              {item.name}
-            </Text>
-            
-            <Chip 
-              icon="hanger" 
-              style={styles.countChip}
-              textStyle={styles.countChipText}
-            >
-              {item.count} ürün
-            </Chip>
+            <Text style={styles.categoryName}>{item.name}</Text>
+            <View style={styles.chip}>
+              <Ionicons name="hanger-outline" size={10} color={COLORS.grayMedium} />
+              <Text style={styles.chipText}>{item.count} ÜRÜN</Text>
+            </View>
           </View>
-        </Card.Content>
+          
+          <Ionicons name="chevron-forward" size={16} color={COLORS.grayMedium} />
+        </View>
+      </TouchableOpacity>
+      
+      <View style={styles.cardActions}>
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.actionButtonPrimary]} 
+          onPress={() => handleCategoryPress(item)}
+        >
+          <Ionicons name="eye-outline" size={14} color={COLORS.white} />
+          <Text style={styles.actionButtonPrimaryText}>GÖRÜNTÜLE</Text>
+        </TouchableOpacity>
         
-        <Card.Actions style={styles.cardActions}>
-          <Button 
-            mode="contained"
-            onPress={() => handleCategoryPress(item)}
-            style={styles.viewButton}
-            labelStyle={styles.viewButtonLabel}
-          >
-            Görüntüle
-          </Button>
-          <Button 
-            mode="outlined"
-            onPress={() => Alert.alert('Favoriler', `${item.name} kategorisi favorilere eklendi`)}
-            style={styles.favoriteButton}
-            labelStyle={styles.favoriteButtonLabel}
-          >
-            Favori
-          </Button>
-        </Card.Actions>
-      </Card>
-    </TouchableOpacity>
-  ), [handleCategoryPress]);
+        <TouchableOpacity 
+          style={[styles.actionButton, styles.actionButtonOutline]} 
+          onPress={() => handleFavoritePress(item)}
+        >
+          <Ionicons name="heart-outline" size={14} color={COLORS.black} />
+          <Text style={styles.actionButtonOutlineText}>FAVORİ</Text>
+        </TouchableOpacity>
+      </View>
+    </View>
+  ), [handleCategoryPress, handleFavoritePress]);
 
   const renderHeader = useCallback(() => (
     <View style={styles.header}>
-      <Appbar.Header style={styles.appbar}>
-        <Appbar.BackAction 
-          onPress={() => navigation.goBack()} 
-          color={COLORS.white}
-        />
-        <Appbar.Content 
-          title="Kategoriler" 
-          titleStyle={styles.appbarTitle}
-        />
-        <Appbar.Action 
-          icon="refresh" 
-          color={COLORS.white}
-          onPress={handleRefresh}
-        />
-      </Appbar.Header>
+      <View style={styles.headerTop}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+          <Ionicons name="arrow-back" size={24} color={COLORS.black} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>KATEGORİLER</Text>
+        <TouchableOpacity onPress={handleRefresh} style={styles.refreshButton}>
+          <Ionicons name="refresh-outline" size={20} color={COLORS.black} />
+        </TouchableOpacity>
+      </View>
       
       <View style={styles.headerStats}>
         <Text style={styles.totalText}>
-          Toplam {categories.length} kategori
+          TOPLAM {categories.length} KATEGORİ
         </Text>
       </View>
     </View>
   ), [categories.length, navigation, handleRefresh]);
 
   const renderEmptyState = useCallback(() => (
-    <View style={globalStyles.centerContainer}>
-      <Ionicons name="grid-outline" size={64} color={COLORS.cloud} />
-      <Text style={styles.emptyTitle}>
-        Henüz kategori yok
-      </Text>
+    <View style={styles.emptyContainer}>
+      <View style={styles.emptyIconContainer}>
+        <Ionicons name="grid-outline" size={40} color={COLORS.grayMedium} />
+      </View>
+      <Text style={styles.emptyTitle}>HENÜZ KATEGORİ YOK</Text>
       <Text style={styles.emptyText}>
         Kategoriler eklendiğinde burada görünecek
       </Text>
-      <Button 
-        mode="contained" 
-        onPress={handleRefresh}
-        style={styles.refreshButton}
-      >
-        Yenile
-      </Button>
+      <TouchableOpacity style={styles.emptyButton} onPress={handleRefresh}>
+        <Text style={styles.emptyButtonText}>YENİLE</Text>
+      </TouchableOpacity>
     </View>
   ), [handleRefresh]);
 
   if (loading) {
     return (
-      <SafeAreaView style={globalStyles.container}>
-        <Appbar.Header style={styles.appbar}>
-          <Appbar.BackAction onPress={() => navigation.goBack()} color={COLORS.white} />
-          <Appbar.Content title="Kategoriler" titleStyle={styles.appbarTitle} />
-        </Appbar.Header>
-        <View style={globalStyles.centerContainer}>
-          <ActivityIndicator size="large" color={COLORS.cognac} />
-          <Text style={styles.loadingText}>Kategoriler yükleniyor...</Text>
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+        <View style={styles.loadingHeader}>
+          <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
+            <Ionicons name="arrow-back" size={24} color={COLORS.black} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>KATEGORİLER</Text>
+          <View style={{ width: 40 }} />
+        </View>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.black} />
+          <Text style={styles.loadingText}>YÜKLENİYOR...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={globalStyles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.cognac} />
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
       
       {renderHeader()}
 
@@ -241,7 +206,7 @@ const CategoriesScreen = ({ navigation }) => {
         data={categories}
         renderItem={renderCategory}
         keyExtractor={(item) => item.id?.toString() || Math.random().toString()}
-        contentContainerStyle={globalStyles.listContainer}
+        contentContainerStyle={styles.listContainer}
         showsVerticalScrollIndicator={false}
         refreshing={refreshing}
         onRefresh={handleRefresh}
@@ -251,105 +216,188 @@ const CategoriesScreen = ({ navigation }) => {
   );
 };
 
+// ============ STILLER ============
 const styles = StyleSheet.create({
-  appbar: {
-    backgroundColor: COLORS.cognac,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.white,
   },
-  appbarTitle: {
-    color: COLORS.white,
-    fontWeight: '600',
-  },
+  
+  // Header
   header: {
-    backgroundColor: COLORS.cognac,
+    backgroundColor: COLORS.white,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.grayLight,
+    paddingBottom: SIZES.sm,
+  },
+  headerTop: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.lg,
+    paddingTop: Platform.OS === 'ios' ? 12 : SIZES.md,
+    paddingBottom: SIZES.md,
+  },
+  loadingHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.lg,
+    paddingTop: Platform.OS === 'ios' ? 12 : SIZES.md,
+    paddingBottom: SIZES.md,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.grayLight,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerTitle: {
+    ...TYPOGRAPHY.caption,
+    letterSpacing: 2,
+  },
+  refreshButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   headerStats: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    backgroundColor: COLORS.cognac,
+    paddingHorizontal: SIZES.lg,
+    paddingBottom: SIZES.sm,
   },
   totalText: {
-    color: COLORS.white,
-    fontSize: 14,
-    opacity: 0.9,
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.grayMedium,
   },
+  
+  // List
+  listContainer: {
+    padding: SIZES.lg,
+    paddingBottom: SIZES.xxl,
+  },
+  
+  // Card
   card: {
-    marginHorizontal: 16,
-    marginBottom: 12,
-    borderRadius: 12,
-    overflow: 'hidden',
+    backgroundColor: COLORS.white,
+    marginBottom: SIZES.md,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
   },
   cardContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: SIZES.md,
+    gap: SIZES.md,
   },
   categoryImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 8,
-    backgroundColor: COLORS.porcelain,
-    marginRight: 16,
+    width: 50,
+    height: 50,
+    backgroundColor: COLORS.surface,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
   },
   categoryInfo: {
     flex: 1,
+    gap: 4,
   },
   categoryName: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.charcoal,
-    marginBottom: 8,
-  },
-  countChip: {
-    backgroundColor: COLORS.porcelain,
-    alignSelf: 'flex-start',
-  },
-  countChipText: {
-    fontSize: 12,
-    color: COLORS.ash,
+    ...TYPOGRAPHY.body,
+    fontWeight: '500',
   },
   cardActions: {
-    paddingHorizontal: 16,
-    paddingBottom: 16,
-    gap: 8,
+    flexDirection: 'row',
+    gap: SIZES.md,
+    paddingHorizontal: SIZES.md,
+    paddingBottom: SIZES.md,
   },
-  viewButton: {
+  
+  // Chip
+  chip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  chipText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium,
+  },
+  
+  // Action Buttons
+  actionButton: {
     flex: 1,
-    backgroundColor: COLORS.cognac,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: SIZES.sm,
   },
-  viewButtonLabel: {
+  actionButtonPrimary: {
+    backgroundColor: COLORS.black,
+  },
+  actionButtonOutline: {
+    backgroundColor: 'transparent',
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+  },
+  actionButtonPrimaryText: {
+    ...TYPOGRAPHY.caption,
     color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '600',
   },
-  favoriteButton: {
+  actionButtonOutlineText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.black,
+  },
+  
+  // Loading State
+  loadingContainer: {
     flex: 1,
-    borderColor: COLORS.cognac,
-  },
-  favoriteButtonLabel: {
-    color: COLORS.cognac,
-    fontSize: 14,
-    fontWeight: '600',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: SIZES.md,
   },
   loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: COLORS.ash,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium,
+  },
+  
+  // Empty State
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: SIZES.xxl,
+    paddingHorizontal: SIZES.xl,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SIZES.lg,
   },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.charcoal,
-    marginTop: 16,
-    marginBottom: 8,
+    ...TYPOGRAPHY.caption,
+    marginBottom: SIZES.sm,
   },
   emptyText: {
-    fontSize: 14,
-    color: COLORS.ash,
+    ...TYPOGRAPHY.bodySmall,
     textAlign: 'center',
-    marginBottom: 20,
+    marginBottom: SIZES.lg,
   },
-  refreshButton: {
-    backgroundColor: COLORS.cognac,
+  emptyButton: {
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    paddingHorizontal: SIZES.xl,
+    paddingVertical: SIZES.md,
+  },
+  emptyButtonText: {
+    ...TYPOGRAPHY.button,
+    color: COLORS.black,
   },
 });
 

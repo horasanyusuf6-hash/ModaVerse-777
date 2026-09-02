@@ -1,5 +1,5 @@
-// 📁 src/screens/TasarimcimScreen.js - REVİZE EDİLMİŞ TAM VERSİYON
-import React, { useState } from 'react';
+// 📁 src/screens/TasarimcimScreen.js - REVİZE (AI Kartı Doğru Yönlendirme)
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   View, 
   Text, 
@@ -13,445 +13,647 @@ import {
   TextInput,
   Dimensions,
   Modal,
-  Alert
+  Alert,
+  RefreshControl,
+  ActivityIndicator,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { COLORS, TYPOGRAPHY, SIZES } from '../constants/Theme';
 
 const { width, height } = Dimensions.get('window');
 
-// ✅ RENK PALETI (App.js ile uyumlu - TÜM RENKLER TAMAMLANDI)
-const COLORS = {
-  white: '#FFFFFF',
-  ivory: '#F9F6F2',
-  paper: '#F5F3EF',
-  cloud: '#F0F0F0',
-  mist: '#E8E8E8',
-  ash: '#888888',
-  charcoal: '#222222',
-  noir: '#000000',
-  accent: '#8C7853',
-  success: '#8C7853',
-  warning: '#B8A99A',
-  error: '#A1887F',
-  cognac: '#8C7853',
-  porcelain: '#FAFAFA',
-  gold: '#D4AF37',
-  goldLight: '#E6C158',
+// KATEGORİLER
+const CATEGORIES = [
+  { id: 'all', name: 'TÜMÜ', icon: 'grid-outline' },
+  { id: 'luxury', name: 'LÜKS', icon: 'diamond-outline' },
+  { id: 'streetwear', name: 'STREETWEAR', icon: 'walk-outline' },
+  { id: 'sustainable', name: 'SÜRDÜRÜLEBİLİR', icon: 'leaf-outline' },
+  { id: 'minimalist', name: 'MİNİMALİST', icon: 'apps-outline' },
+  { id: 'vintage', name: 'VİNTAGE', icon: 'time-outline' },
+  { id: 'sport', name: 'SPOR', icon: 'basketball-outline' },
+];
+
+// AI İSTATİSTİKLERİ
+const AI_STATS = {
+  analyses: 1247,
+  combinations: 89,
+  matchRate: 94,
+  savedItems: 342,
+  outfitsCreated: 56,
 };
 
-const TasarimcimScreen = () => {
+// TASARIMCILAR & MARKALAR
+const designersAndBrands = [
+  {
+    id: '1',
+    type: 'designer',
+    name: 'Zeynep Ak',
+    title: 'Sürdürülebilir Moda Tasarımcısı',
+    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400',
+    cover: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=800',
+    followers: 12500,
+    followersDisplay: '12.5K',
+    rating: 4.8,
+    location: 'İstanbul',
+    description: 'Sürdürülebilir ve etik moda üzerine çalışan ödüllü tasarımcı.',
+    isVerified: true,
+    trending: 98,
+    category: 'sustainable',
+    designs: [
+      { id: 'd1', image: 'https://images.unsplash.com/photo-1569317002804-ab77bcf1bce4?w=600', title: 'Eko-Koleksiyon 2024', likes: 3420, comments: 156 },
+      { id: 'd2', image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=600', title: 'Sonbahar Tasarımı', likes: 2890, comments: 98 },
+      { id: 'd3', image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=600', title: 'Paris Moda Haftası', likes: 5670, comments: 234 },
+    ],
+  },
+  {
+    id: '2',
+    type: 'brand',
+    name: 'Nike',
+    title: 'Spor Giyim & Sneaker',
+    avatar: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400',
+    cover: 'https://images.unsplash.com/photo-1544441893-973675e31985?w=800',
+    followers: 2100000,
+    followersDisplay: '2.1M',
+    rating: 4.7,
+    location: 'Global',
+    description: 'Dünyanın önde gelen spor giyim ve ayakkabı markası.',
+    isVerified: true,
+    trending: 95,
+    category: 'sport',
+    designs: [
+      { id: 'd1', image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600', title: 'Air Max Günleri', likes: 8920, comments: 456 },
+      { id: 'd2', image: 'https://images.unsplash.com/photo-1544441893-973675e31985?w=600', title: 'Jordan Koleksiyonu', likes: 12400, comments: 892 },
+      { id: 'd3', image: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?w=600', title: 'Tech Fleece Serisi', likes: 5670, comments: 234 },
+    ],
+  },
+  {
+    id: '3',
+    type: 'designer',
+    name: 'Can Demir',
+    title: 'Street Style Tasarımcısı',
+    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
+    cover: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800',
+    followers: 8700,
+    followersDisplay: '8.7K',
+    rating: 4.6,
+    location: 'İstanbul',
+    description: 'Urban kültürden ilham alan genç tasarımcı.',
+    isVerified: false,
+    trending: 92,
+    category: 'streetwear',
+    designs: [
+      { id: 'd1', image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=600', title: 'Urban Warriors', likes: 2340, comments: 89 },
+      { id: 'd2', image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600', title: 'Street Collection', likes: 1890, comments: 67 },
+      { id: 'd3', image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=600', title: 'City Lights', likes: 1230, comments: 45 },
+    ],
+  },
+  {
+    id: '4',
+    type: 'brand',
+    name: 'ZARA',
+    title: 'Fast Fashion',
+    avatar: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=400',
+    cover: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800',
+    followers: 3400000,
+    followersDisplay: '3.4M',
+    rating: 4.5,
+    location: 'Global',
+    description: 'Trendleri hızlı şekilde tüketiciye ulaştıran global marka.',
+    isVerified: true,
+    trending: 88,
+    category: 'luxury',
+    designs: [
+      { id: 'd1', image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=600', title: 'Sonbahar Koleksiyonu', likes: 12400, comments: 892 },
+      { id: 'd2', image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=600', title: 'Yeni Sezon', likes: 8900, comments: 456 },
+      { id: 'd3', image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=600', title: 'Basic Serisi', likes: 5670, comments: 234 },
+    ],
+  },
+  {
+    id: '5',
+    type: 'designer',
+    name: 'Elif Şahin',
+    title: 'Lüks Giyim Tasarımcısı',
+    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400',
+    cover: 'https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?w=800',
+    followers: 15200,
+    followersDisplay: '15.2K',
+    rating: 4.9,
+    location: 'Paris',
+    description: 'Paris merkezli lüks giyim ve haute couture tasarımcısı.',
+    isVerified: true,
+    trending: 96,
+    category: 'luxury',
+    designs: [
+      { id: 'd1', image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=600', title: 'Parisian Nights', likes: 5670, comments: 234 },
+      { id: 'd2', image: 'https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?w=600', title: 'Haute Couture', likes: 4320, comments: 178 },
+      { id: 'd3', image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=600', title: 'Golden Collection', likes: 3210, comments: 123 },
+    ],
+  },
+  {
+    id: '6',
+    type: 'brand',
+    name: 'Mango',
+    title: 'Minimalist Moda',
+    avatar: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=400',
+    cover: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800',
+    followers: 2800000,
+    followersDisplay: '2.8M',
+    rating: 4.6,
+    location: 'Barcelona',
+    description: 'Minimalist ve şık tasarımlarıyla bilinen marka.',
+    isVerified: true,
+    trending: 85,
+    category: 'minimalist',
+    designs: [
+      { id: 'd1', image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600', title: 'Minimalist Collection', likes: 3450, comments: 123 },
+      { id: 'd2', image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=600', title: 'Neutral Tones', likes: 2780, comments: 98 },
+      { id: 'd3', image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600', title: 'Capsule Wardrobe', likes: 1890, comments: 67 },
+    ],
+  },
+  {
+    id: '7',
+    type: 'brand',
+    name: 'Adidas',
+    title: 'Sport Performance',
+    avatar: 'https://images.unsplash.com/photo-1587563871167-1ee9c731aefb?w=400',
+    cover: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?w=800',
+    followers: 5600000,
+    followersDisplay: '5.6M',
+    rating: 4.8,
+    location: 'Germany',
+    description: 'Spor performans ve günlük giyimde lider marka.',
+    isVerified: true,
+    trending: 94,
+    category: 'sport',
+    designs: [
+      { id: 'd1', image: 'https://images.unsplash.com/photo-1587563871167-1ee9c731aefb?w=600', title: 'Ultraboost 2024', likes: 8920, comments: 567 },
+      { id: 'd2', image: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?w=600', title: 'Originals Serisi', likes: 6780, comments: 345 },
+      { id: 'd3', image: 'https://images.unsplash.com/photo-1587563871167-1ee9c731aefb?w=600', title: 'Yeezy Koleksiyonu', likes: 12340, comments: 890 },
+    ],
+  },
+];
+
+// ============ AI DANIŞMAN KARTI (REVİZE - DOĞRU YÖNLENDİRME) ============
+const AIConsultantCard = ({ navigation }) => {
+  const [aiStats] = useState(AI_STATS);
+
+  const formatNumber = (num) => {
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  };
+
+  return (
+    <TouchableOpacity 
+      style={styles.aiCard}
+      activeOpacity={0.7}
+      onPress={() => {
+        // ✅ DOĞRU YÖNLENDİRME - Stilim tab'ına ve OutfitSuggestion ekranına git
+        navigation.navigate('Stilim', { 
+          screen: 'OutfitSuggestion' 
+        });
+      }}
+    >
+      <Image 
+        source={{ uri: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=800' }} 
+        style={styles.aiCoverImage} 
+      />
+      <View style={styles.aiOverlay} />
+      <View style={styles.aiContent}>
+        <View style={styles.aiHeader}>
+          <View style={styles.aiTitleContainer}>
+            <Text style={styles.aiTitle}>AI STİL DANIŞMANIM</Text>
+            <View style={styles.aiBadge}>
+              <Ionicons name="sparkles" size={10} color={COLORS.white} />
+              <Text style={styles.aiBadgeText}>AKTİF</Text>
+            </View>
+          </View>
+          <View style={styles.aiArrowContainer}>
+            <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
+          </View>
+        </View>
+        
+        <Text style={styles.aiSlogan}>💬 "Stil danışmanınla sohbet et, kombinlerini keşfet!"</Text>
+        
+        <View style={styles.aiStatsGrid}>
+          <View style={styles.aiStatCard}>
+            <View style={styles.aiStatIconBg}>
+              <Ionicons name="shirt-outline" size={14} color={COLORS.black} />
+            </View>
+            <Text style={styles.aiStatNumber}>{formatNumber(aiStats.analyses)}</Text>
+            <Text style={styles.aiStatLabel}>PARÇA</Text>
+          </View>
+          
+          <View style={styles.aiStatCard}>
+            <View style={styles.aiStatIconBg}>
+              <Ionicons name="color-palette-outline" size={14} color={COLORS.black} />
+            </View>
+            <Text style={styles.aiStatNumber}>{formatNumber(aiStats.combinations)}</Text>
+            <Text style={styles.aiStatLabel}>KOMBİN</Text>
+          </View>
+          
+          <View style={styles.aiStatCard}>
+            <View style={styles.aiStatIconBg}>
+              <Ionicons name="save-outline" size={14} color={COLORS.black} />
+            </View>
+            <Text style={styles.aiStatNumber}>{formatNumber(aiStats.savedItems)}</Text>
+            <Text style={styles.aiStatLabel}>GARDIROP</Text>
+          </View>
+          
+          <View style={styles.aiStatCard}>
+            <View style={styles.aiStatIconBg}>
+              <Ionicons name="trending-up" size={14} color={COLORS.black} />
+            </View>
+            <Text style={styles.aiStatNumber}>%{aiStats.matchRate}</Text>
+            <Text style={styles.aiStatLabel}>UYUM</Text>
+          </View>
+        </View>
+        
+        <View style={styles.aiButton}>
+          <Ionicons name="chatbubble-ellipses" size={12} color={COLORS.white} />
+          <Text style={styles.aiButtonText}>SOHBET ET</Text>
+          <Ionicons name="arrow-forward" size={10} color={COLORS.white} />
+        </View>
+      </View>
+    </TouchableOpacity>
+  );
+};
+
+// ============ TASARIMCI/MARKA KARTI ============
+const DesignerBrandCard = ({ item, onPress, onFollow, isFollowing }) => {
+  const [showAllDesigns, setShowAllDesigns] = useState(false);
+  const displayDesigns = showAllDesigns ? item.designs : item.designs.slice(0, 2);
+
+  const formatNumber = (num) => {
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  };
+
+  return (
+    <View style={styles.designerCard}>
+      <TouchableOpacity style={styles.cardHeader} onPress={() => onPress(item)} activeOpacity={0.7}>
+        <Image source={{ uri: item.avatar }} style={styles.cardAvatar} />
+        <View style={styles.cardUserInfo}>
+          <View style={styles.cardNameRow}>
+            <Text style={styles.cardName}>{item.name}</Text>
+            {item.isVerified && (
+              <Ionicons name="checkmark-circle" size={12} color={COLORS.black} />
+            )}
+            <View style={styles.cardTypeBadge}>
+              <Text style={styles.cardTypeBadgeText}>
+                {item.type === 'designer' ? 'TASARIMCI' : 'MARKA'}
+              </Text>
+            </View>
+          </View>
+          <Text style={styles.cardTitle}>{item.title}</Text>
+          <View style={styles.cardStats}>
+            <View style={styles.cardStat}>
+              <Ionicons name="people-outline" size={10} color={COLORS.grayMedium} />
+              <Text style={styles.cardStatText}>{item.followersDisplay}</Text>
+            </View>
+            <View style={styles.cardStat}>
+              <Ionicons name="star-outline" size={10} color={COLORS.grayMedium} />
+              <Text style={styles.cardStatText}>{item.rating}</Text>
+            </View>
+            <View style={styles.cardStat}>
+              <Ionicons name="location-outline" size={10} color={COLORS.grayMedium} />
+              <Text style={styles.cardStatText}>{item.location}</Text>
+            </View>
+          </View>
+        </View>
+        <TouchableOpacity 
+          style={[styles.followButton, isFollowing && styles.followButtonActive]}
+          onPress={() => onFollow(item.id)}
+        >
+          <Text style={[styles.followButtonText, isFollowing && styles.followButtonTextActive]}>
+            {isFollowing ? 'TAKİP' : 'TAKİP ET'}
+          </Text>
+        </TouchableOpacity>
+      </TouchableOpacity>
+
+      {item.designs && item.designs.length > 0 && (
+        <View style={styles.designsSection}>
+          <View style={styles.designsHeader}>
+            <Text style={styles.designsTitle}>
+              {item.type === 'designer' ? 'SON TASARIMLAR' : 'SON KOLEKSİYONLAR'}
+            </Text>
+            {item.designs.length > 2 && (
+              <TouchableOpacity onPress={() => setShowAllDesigns(!showAllDesigns)}>
+                <Text style={styles.designsSeeAll}>
+                  {showAllDesigns ? 'DAHA AZ' : 'TÜMÜ'}
+                </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+          
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.designsScroll}>
+            {displayDesigns.map((design, idx) => (
+              <TouchableOpacity key={idx} style={styles.designCard} activeOpacity={0.7}>
+                <Image source={{ uri: design.image }} style={styles.designImage} />
+                <View style={styles.designOverlay}>
+                  <Text style={styles.designTitle} numberOfLines={1}>{design.title}</Text>
+                  <View style={styles.designStats}>
+                    <View style={styles.designStat}>
+                      <Ionicons name="heart-outline" size={8} color={COLORS.white} />
+                      <Text style={styles.designStatText}>{formatNumber(design.likes)}</Text>
+                    </View>
+                    <View style={styles.designStat}>
+                      <Ionicons name="chatbubble-outline" size={8} color={COLORS.white} />
+                      <Text style={styles.designStatText}>{formatNumber(design.comments)}</Text>
+                    </View>
+                  </View>
+                </View>
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      )}
+    </View>
+  );
+};
+
+// ============ KATEGORİ FİLTRELEME ============
+const CategoryFilters = ({ selectedCategory, onSelectCategory }) => {
+  return (
+    <ScrollView 
+      horizontal 
+      showsHorizontalScrollIndicator={false} 
+      style={styles.categoriesScroll}
+      contentContainerStyle={styles.categoriesContent}
+    >
+      {CATEGORIES.map((category) => (
+        <TouchableOpacity
+          key={category.id}
+          style={[styles.categoryChip, selectedCategory === category.id && styles.categoryChipActive]}
+          onPress={() => onSelectCategory(category.id)}
+        >
+          <Ionicons 
+            name={category.icon} 
+            size={12} 
+            color={selectedCategory === category.id ? COLORS.white : COLORS.grayMedium} 
+          />
+          <Text style={[styles.categoryChipText, selectedCategory === category.id && styles.categoryChipTextActive]}>
+            {category.name}
+          </Text>
+        </TouchableOpacity>
+      ))}
+    </ScrollView>
+  );
+};
+
+// ============ TREND BÖLÜMÜ ============
+const TrendingSection = ({ items, onPress, onFollow, following, type }) => {
+  return (
+    <View style={styles.trendingSection}>
+      <View style={styles.trendingHeader}>
+        <Text style={styles.trendingTitle}>
+          TREND {type === 'designer' ? 'TASARIMCILAR' : 'MARKALAR'}
+        </Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.trendingScroll}>
+        {items.map((item) => (
+          <TouchableOpacity 
+            key={item.id} 
+            style={styles.trendingCard}
+            onPress={() => onPress(item)}
+            activeOpacity={0.7}
+          >
+            <Image source={{ uri: item.avatar }} style={styles.trendingAvatar} />
+            <Text style={styles.trendingName} numberOfLines={1}>{item.name}</Text>
+            <Text style={styles.trendingTitleText} numberOfLines={1}>{item.title}</Text>
+            <View style={styles.trendingTrend}>
+              <Ionicons name="trending-up" size={8} color={COLORS.grayMedium} />
+              <Text style={styles.trendingPercent}>%{item.trending}</Text>
+            </View>
+            <TouchableOpacity 
+              style={[styles.trendingFollowBtn, following.includes(item.id) && styles.trendingFollowBtnActive]}
+              onPress={() => onFollow(item.id)}
+            >
+              <Text style={[styles.trendingFollowBtnText, following.includes(item.id) && styles.trendingFollowBtnTextActive]}>
+                {following.includes(item.id) ? 'TAKİP' : 'TAKİP ET'}
+              </Text>
+            </TouchableOpacity>
+          </TouchableOpacity>
+        ))}
+      </ScrollView>
+    </View>
+  );
+};
+
+// ============ ANA BİLEŞEN ============
+const TasarimcimScreen = ({ navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeTab, setActiveTab] = useState('designers');
-  const [showMenu, setShowMenu] = useState(false);
-  const [selectedDesigner, setSelectedDesigner] = useState(null);
+  const [selectedCategory, setSelectedCategory] = useState('all');
+  const [selectedItem, setSelectedItem] = useState(null);
+  const [following, setFollowing] = useState([]);
+  const [refreshing, setRefreshing] = useState(false);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [displayData, setDisplayData] = useState([]);
+  const pageSize = 5;
+  
+  const flatListRef = useRef(null);
 
-  // ✅ MARKA/TASARIMCI KATEGORILERI
-  const categories = [
-    { id: 'all', name: 'Tümü', icon: 'grid-outline' },
-    { id: 'luxury', name: 'Lüks', icon: 'diamond-outline' },
-    { id: 'street', name: 'Street', icon: 'walk-outline' },
-    { id: 'sustainable', name: 'Sürdürülebilir', icon: 'leaf-outline' },
-    { id: 'minimalist', name: 'Minimalist', icon: 'apps-outline' },
-    { id: 'vintage', name: 'Vintage', icon: 'time-outline' },
-  ];
+  useEffect(() => {
+    loadFollowing();
+  }, []);
 
-  // ✅ GERÇEK TASARIMCILAR & MARKALAR
-  const designersData = [
-    {
-      id: '1',
-      type: 'designer',
-      name: 'Zeynep Ak',
-      title: 'Sürdürülebilir Moda Tasarımcısı',
-      avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=300',
-      cover: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=800',
-      followers: '12.5K',
-      rating: 4.8,
-      projects: 42,
-      location: 'İstanbul',
-      website: 'zeynepak.com',
-      instagram: '@zeynepakstudio',
-      description: 'Sürdürülebilir ve etik moda üzerine çalışan ödüllü tasarımcı.',
-      collections: ['Eko-Koleksiyon 2024', 'Doğal Dokunuşlar'],
-      products: [
-        { id: 'p1', name: 'Organik Pamuk Elbise', price: 1299, image: 'https://images.unsplash.com/photo-1569317002804-ab77bcf1bce4?w=400' },
-        { id: 'p2', name: 'Geri Dönüşümlü Ceket', price: 899, image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400' },
-      ],
-      isVerified: true,
-    },
-    {
-      id: '2',
-      type: 'brand',
-      name: 'Nike',
-      title: 'Spor Giyim & Sneaker',
-      avatar: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300',
-      cover: 'https://images.unsplash.com/photo-1544441893-675973e31985?w=800',
-      followers: '2.1M',
-      rating: 4.7,
-      products: 156,
-      location: 'Global',
-      website: 'nike.com',
-      instagram: '@nike',
-      description: 'Dünyanın önde gelen spor giyim ve ayakkabı markası.',
-      collections: ['Air Max Serisi', 'Jordan Koleksiyonu'],
-      designers: ['Tinker Hatfield', 'Peter Moore'],
-      isVerified: true,
-    },
-    {
-      id: '3',
-      type: 'designer',
-      name: 'Can Demir',
-      title: 'Street Style Tasarımcısı',
-      avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300',
-      cover: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800',
-      followers: '8.7K',
-      rating: 4.6,
-      projects: 28,
-      location: 'İstanbul',
-      website: 'candemir.com',
-      instagram: '@candesigns',
-      description: 'Urban kültürden ilham alan genç tasarımcı.',
-      collections: ['Urban Warriors', 'City Lights'],
-      products: [
-        { id: 'p3', name: 'Oversize Hoodie', price: 599, image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=400' },
-        { id: 'p4', name: 'Cargo Jogger', price: 449, image: 'https://images.unsplash.com/photo-1624378439575-d8705ad7ae80?w=400' },
-      ],
-      isVerified: false,
-    },
-    {
-      id: '4',
-      type: 'brand',
-      name: 'ZARA',
-      title: 'Fast Fashion',
-      avatar: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=300',
-      cover: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800',
-      followers: '3.4M',
-      rating: 4.5,
-      products: 892,
-      location: 'Global',
-      website: 'zara.com',
-      instagram: '@zara',
-      description: 'Trendleri hızlı şekilde tüketiciye ulaştıran global marka.',
-      collections: ['TRF Genç', 'Premium Collection'],
-      designers: ['Amancio Ortega', 'Marta Ortega'],
-      isVerified: true,
-    },
-    {
-      id: '5',
-      type: 'designer',
-      name: 'Elif Şahin',
-      title: 'Lüks Giyim Tasarımcısı',
-      avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=300',
-      cover: 'https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?w=800',
-      followers: '15.2K',
-      rating: 4.9,
-      projects: 56,
-      location: 'Paris',
-      website: 'elifsahin.com',
-      instagram: '@elifsahin.haute',
-      description: 'Paris merkezli lüks giyim ve haute couture tasarımcısı.',
-      collections: ['Parisian Nights', 'Golden Age'],
-      products: [
-        { id: 'p5', name: 'İpek Gece Elbisesi', price: 3499, image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=400' },
-        { id: 'p6', name: 'Kadife Blazer', price: 1899, image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400' },
-      ],
-      isVerified: true,
-    },
-  ];
+  useEffect(() => {
+    updateDisplayData();
+  }, [searchQuery, selectedCategory, activeTab, following, page]);
 
-  // ✅ AI DANIŞMAN VERISI
-  const aiConsultant = {
-    name: 'AI Stil Danışmanım',
-    avatar: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=300',
-    description: 'Yapay zeka destekli kişisel stil danışmanınız.',
-    features: [
-      'Gardırop Analizi',
-      'Kombin Önerileri',
-      'Trend Takibi',
-      'Alışveriş Asistanı'
-    ],
-    stats: {
-      analyses: '1,248',
-      satisfaction: '94%',
-      recommendations: '357'
+  const loadFollowing = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('@following_designers');
+      const followingList = saved ? JSON.parse(saved) : [];
+      setFollowing(followingList);
+    } catch (error) {
+      console.error(error);
     }
   };
 
-  // ✅ ÖRNEK SORULAR (AI Danışman için)
-  const sampleQuestions = [
-    { id: 'q1', text: 'Bana hangi renkler yakışır?' },
-    { id: 'q2', text: 'Mezuniyet töreni için kombin önerir misin?' },
-    { id: 'q3', text: 'Vücut tipime göre hangi kıyafetleri seçmeliyim?' },
-    { id: 'q4', text: 'Gardırobumdaki parçalarla kaç kombin yapabilirim?' },
-    { id: 'q5', text: 'Bu sezon hangi trendler öne çıkıyor?' },
-    { id: 'q6', text: 'Ofis şıklığı için temel parçalar neler?' },
-  ];
+  const saveFollowing = async (followingList) => {
+    try {
+      await AsyncStorage.setItem('@following_designers', JSON.stringify(followingList));
+    } catch (error) {
+      console.error(error);
+    }
+  };
 
-  // ✅ 3 ÇİZGİ MENÜ İÇERİĞİ
-  const menuItems = [
-    { id: 1, name: 'Profilim', icon: 'person-outline' },
-    { id: 2, name: 'Ayarlar', icon: 'settings-outline' },
-    { id: 3, name: 'Favorilerim', icon: 'heart-outline' },
-    { id: 4, name: 'Siparişlerim', icon: 'cube-outline' },
-    { id: 5, name: 'Yardım', icon: 'help-circle-outline' },
-    { id: 6, name: 'Çıkış Yap', icon: 'log-out-outline' },
-  ];
+  const getFilteredData = () => {
+    let filtered = designersAndBrands.filter(item => item.type === activeTab);
+    
+    if (selectedCategory !== 'all') {
+      filtered = filtered.filter(item => item.category === selectedCategory);
+    }
+    
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(item => 
+        item.name.toLowerCase().includes(query) ||
+        item.title.toLowerCase().includes(query) ||
+        item.location.toLowerCase().includes(query)
+      );
+    }
+    
+    filtered.sort((a, b) => b.trending - a.trending);
+    return filtered;
+  };
 
-  // ✅ AI DANIŞMAN KARTI
-  const AIConsultantCard = () => (
-    <TouchableOpacity 
-      style={styles.aiCard}
-      onPress={() => setActiveTab('ai')}
-      activeOpacity={0.9}
-    >
-      <Image 
-        source={{ uri: aiConsultant.avatar }} 
-        style={styles.aiAvatar} 
-      />
-      
-      <View style={styles.aiContent}>
-        <View style={styles.aiHeader}>
-          <Text style={styles.aiTitle}>🤖 {aiConsultant.name}</Text>
-          <View style={styles.aiBadge}>
-            <Ionicons name="sparkles" size={14} color="#FFF" />
-            <Text style={styles.aiBadgeText}>AI</Text>
-          </View>
+  const updateDisplayData = () => {
+    const filtered = getFilteredData();
+    setDisplayData(filtered.slice(0, page * pageSize));
+  };
+
+  const loadMoreData = () => {
+    if (isLoadingMore) return;
+    const filtered = getFilteredData();
+    if (page * pageSize < filtered.length) {
+      setIsLoadingMore(true);
+      setTimeout(() => {
+        setPage(prev => prev + 1);
+        setIsLoadingMore(false);
+      }, 500);
+    }
+  };
+
+  const handleFollow = async (itemId) => {
+    const isCurrentlyFollowing = following.includes(itemId);
+    const newFollowing = isCurrentlyFollowing
+      ? following.filter(id => id !== itemId)
+      : [...following, itemId];
+    
+    setFollowing(newFollowing);
+    await saveFollowing(newFollowing);
+    
+    const item = designersAndBrands.find(d => d.id === itemId);
+    Alert.alert(
+      isCurrentlyFollowing ? 'Takip Bırakıldı' : 'Takip Ediliyor',
+      `${item?.name || 'Kullanıcı'} artık ${isCurrentlyFollowing ? 'takip etmiyorsunuz' : 'takip ediyorsunuz'}.`
+    );
+  };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    setPage(1);
+    await loadFollowing();
+    setTimeout(() => setRefreshing(false), 1000);
+  }, []);
+
+  const handleCategorySelect = (categoryId) => {
+    setSelectedCategory(categoryId);
+    setPage(1);
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
+
+  const getTrendingItems = () => {
+    return designersAndBrands
+      .filter(item => item.type === activeTab)
+      .sort((a, b) => b.trending - a.trending)
+      .slice(0, 5);
+  };
+
+  const EmptyState = () => {
+    const hasFilters = searchQuery || selectedCategory !== 'all';
+    return (
+      <View style={styles.emptyContainer}>
+        <View style={styles.emptyIconContainer}>
+          <Ionicons name="search-outline" size={32} color={COLORS.grayMedium} />
         </View>
-        
-        <Text style={styles.aiDescription}>
-          {aiConsultant.description} Kişisel stil analizi ve öneriler için tıklayın.
+        <Text style={styles.emptyTitle}>SONUÇ BULUNAMADI</Text>
+        <Text style={styles.emptyText}>
+          {searchQuery ? `"${searchQuery}" ile eşleşen ${activeTab === 'designers' ? 'tasarımcı' : 'marka'} yok` : 
+           selectedCategory !== 'all' ? `Bu kategoride ${activeTab === 'designers' ? 'tasarımcı' : 'marka'} yok` :
+           `${activeTab === 'designers' ? 'Tasarımcı' : 'Marka'} bulunamadı`}
         </Text>
-        
-        <View style={styles.aiFeatures}>
-          {aiConsultant.features.map((feature, index) => (
-            <View key={index} style={styles.featureTag}>
-              <Text style={styles.featureText}>{feature}</Text>
-            </View>
-          ))}
-        </View>
-        
-        <View style={styles.aiStats}>
-          <View style={styles.aiStat}>
-            <Text style={styles.statNumber}>{aiConsultant.stats.analyses}</Text>
-            <Text style={styles.statLabel}>Analiz</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.aiStat}>
-            <Text style={styles.statNumber}>{aiConsultant.stats.satisfaction}</Text>
-            <Text style={styles.statLabel}>Memnuniyet</Text>
-          </View>
-          <View style={styles.statDivider} />
-          <View style={styles.aiStat}>
-            <Text style={styles.statNumber}>{aiConsultant.stats.recommendations}</Text>
-            <Text style={styles.statLabel}>Öneri</Text>
-          </View>
-        </View>
-        
-        <TouchableOpacity style={styles.aiButton} onPress={() => setActiveTab('ai')}>
-          <Ionicons name="chatbubble-ellipses" size={20} color="#FFF" />
-          <Text style={styles.aiButtonText}>Danışmana Sor</Text>
-        </TouchableOpacity>
+        {hasFilters && (
+          <TouchableOpacity 
+            style={styles.clearButton} 
+            onPress={() => {
+              setSearchQuery('');
+              setSelectedCategory('all');
+            }}
+          >
+            <Text style={styles.clearButtonText}>FİLTRELERİ TEMİZLE</Text>
+          </TouchableOpacity>
+        )}
       </View>
-    </TouchableOpacity>
-  );
+    );
+  };
 
-  // ✅ AI DANIŞMAN İÇERİĞİ
-  const AITabContent = () => (
-    <View style={styles.aiTabContent}>
-      <View style={styles.aiWelcomeCard}>
-        <Ionicons name="sparkles" size={60} color={COLORS.accent} />
-        <Text style={styles.aiWelcomeTitle}>AI Stil Danışmanım</Text>
-        <Text style={styles.aiWelcomeText}>
-          Size özel stil analizleri, kombin önerileri ve trend takibi için sorularınızı bekliyorum. 
-          Aklınızdaki her şeyi bana sorabilirsiniz!
-        </Text>
-      </View>
-
-      <View style={styles.sampleQuestionsContainer}>
-        <Text style={styles.sampleQuestionsTitle}>💭 Sık Sorulan Sorular</Text>
-        <Text style={styles.sampleQuestionsSubtitle}>
-          Aşağıdaki sorulara tıklayarak hızlıca başlayabilirsiniz
-        </Text>
-        
-        <View style={styles.questionsGrid}>
-          {sampleQuestions.map((item) => (
-            <TouchableOpacity 
-              key={item.id} 
-              style={styles.questionCard}
-              onPress={() => {
-                Alert.alert(
-                  '🤖 AI Danışman',
-                  `"${item.text}" sorusu için en kısa sürede cevap vereceğim.`,
-                  [{ text: 'Tamam' }]
-                );
-              }}
-            >
-              <View style={styles.questionIcon}>
-                <Ionicons name="help-circle" size={24} color={COLORS.accent} />
-              </View>
-              <Text style={styles.questionText}>{item.text}</Text>
-              <Ionicons name="arrow-forward" size={20} color={COLORS.accent} />
-            </TouchableOpacity>
-          ))}
-        </View>
-      </View>
-
-      <TouchableOpacity style={styles.startChatButton}>
-        <Ionicons name="chatbubbles" size={24} color={COLORS.white} />
-        <Text style={styles.startChatText}>Yeni Sohbet Başlat</Text>
-      </TouchableOpacity>
-
-      <View style={styles.aiStatsCard}>
-        <View style={styles.aiStatItem}>
-          <Text style={styles.aiStatNumber}>1,248</Text>
-          <Text style={styles.aiStatLabel}>Analiz</Text>
-        </View>
-        <View style={styles.aiStatDivider} />
-        <View style={styles.aiStatItem}>
-          <Text style={styles.aiStatNumber}>94%</Text>
-          <Text style={styles.aiStatLabel}>Memnuniyet</Text>
-        </View>
-        <View style={styles.aiStatDivider} />
-        <View style={styles.aiStatItem}>
-          <Text style={styles.aiStatNumber}>357</Text>
-          <Text style={styles.aiStatLabel}>Öneri</Text>
-        </View>
-      </View>
-    </View>
-  );
-
-  // ✅ TASARIMCI/MARKA KARTI
-  const DesignerCard = ({ item }) => (
-    <TouchableOpacity 
-      style={styles.designerCard}
-      onPress={() => setSelectedDesigner(item)}
-      activeOpacity={0.8}
-    >
-      <View style={styles.cardHeader}>
-        <Image source={{ uri: item.avatar }} style={styles.designerAvatar} />
-        <View style={styles.verificationBadge}>
-          {item.isVerified && (
-            <Ionicons name="checkmark-circle" size={16} color="#4CAF50" />
-          )}
-        </View>
-      </View>
-      
-      <View style={styles.cardContent}>
-        <View style={styles.nameRow}>
-          <Text style={styles.designerName}>{item.name}</Text>
-          <View style={styles.typeBadge}>
-            <Text style={styles.typeText}>
-              {item.type === 'designer' ? '👨‍🎨' : '🏢'}
-            </Text>
-          </View>
-        </View>
-        
-        <Text style={styles.designerTitle}>{item.title}</Text>
-        
-        <View style={styles.designerStats}>
-          <View style={styles.stat}>
-            <Ionicons name="people-outline" size={14} color={COLORS.ash} />
-            <Text style={styles.statText}>{item.followers}</Text>
-          </View>
-          <View style={styles.stat}>
-            <Ionicons name="star-outline" size={14} color="#FFD700" />
-            <Text style={styles.statText}>{item.rating}</Text>
-          </View>
-          <View style={styles.stat}>
-            <Ionicons name="cube-outline" size={14} color={COLORS.ash} />
-            <Text style={styles.statText}>
-              {item.type === 'designer' ? `${item.projects}` : `${item.products}`}
-            </Text>
-          </View>
-        </View>
-        
-        <Text style={styles.designerLocation}>
-          <Ionicons name="location-outline" size={12} color={COLORS.ash} /> {item.location}
-        </Text>
-      </View>
-      
-      <TouchableOpacity style={styles.followButton}>
-        <Ionicons name="add" size={18} color={COLORS.accent} />
-        <Text style={styles.followText}>Takip Et</Text>
-      </TouchableOpacity>
-    </TouchableOpacity>
-  );
-
-  // ✅ TASARIMCI DETAY MODALI
   const DesignerDetailModal = () => {
-    if (!selectedDesigner) return null;
+    if (!selectedItem) return null;
     
     return (
       <Modal
-        visible={!!selectedDesigner}
+        visible={!!selectedItem}
         animationType="slide"
         transparent={true}
-        onRequestClose={() => setSelectedDesigner(null)}
+        onRequestClose={() => setSelectedItem(null)}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.modalContainer}>
-            <ScrollView>
+            <ScrollView showsVerticalScrollIndicator={false}>
               <View style={styles.modalHeader}>
-                <Image 
-                  source={{ uri: selectedDesigner.cover }} 
-                  style={styles.modalCover} 
-                />
-                <TouchableOpacity 
-                  style={styles.closeButton}
-                  onPress={() => setSelectedDesigner(null)}
-                >
-                  <Ionicons name="close" size={24} color="#FFF" />
+                <Image source={{ uri: selectedItem.cover }} style={styles.modalCover} />
+                <TouchableOpacity style={styles.closeButton} onPress={() => setSelectedItem(null)}>
+                  <Ionicons name="close" size={20} color={COLORS.white} />
                 </TouchableOpacity>
-                
                 <View style={styles.modalProfile}>
-                  <Image 
-                    source={{ uri: selectedDesigner.avatar }} 
-                    style={styles.modalAvatar} 
-                  />
+                  <Image source={{ uri: selectedItem.avatar }} style={styles.modalAvatar} />
                   <View style={styles.modalProfileInfo}>
-                    <Text style={styles.modalName}>{selectedDesigner.name}</Text>
-                    <Text style={styles.modalTitle}>{selectedDesigner.title}</Text>
+                    <Text style={styles.modalName}>{selectedItem.name}</Text>
+                    <Text style={styles.modalTitle}>{selectedItem.title}</Text>
                   </View>
                 </View>
               </View>
-              
               <View style={styles.modalContent}>
-                <Text style={styles.modalDescription}>
-                  {selectedDesigner.description}
-                </Text>
-                
-                <View style={styles.socialLinks}>
-                  <TouchableOpacity style={styles.socialButton}>
-                    <Ionicons name="globe-outline" size={18} color={COLORS.accent} />
-                    <Text style={styles.socialText}>{selectedDesigner.website}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.socialButton}>
-                    <Ionicons name="logo-instagram" size={18} color={COLORS.accent} />
-                    <Text style={styles.socialText}>{selectedDesigner.instagram}</Text>
-                  </TouchableOpacity>
+                <Text style={styles.modalDescription}>{selectedItem.description}</Text>
+                <View style={styles.modalStats}>
+                  <View style={styles.modalStat}>
+                    <Text style={styles.modalStatNumber}>{selectedItem.followersDisplay}</Text>
+                    <Text style={styles.modalStatLabel}>TAKİPÇİ</Text>
+                  </View>
+                  <View style={styles.modalStatDivider} />
+                  <View style={styles.modalStat}>
+                    <Text style={styles.modalStatNumber}>{selectedItem.rating}</Text>
+                    <Text style={styles.modalStatLabel}>PUAN</Text>
+                  </View>
                 </View>
                 
-                <Text style={styles.sectionTitle}>Koleksiyonlar</Text>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                  {selectedDesigner.collections?.map((collection, index) => (
-                    <View key={index} style={styles.collectionCard}>
-                      <Text style={styles.collectionName}>{collection}</Text>
-                    </View>
-                  ))}
-                </ScrollView>
+                {selectedItem.designs && selectedItem.designs.length > 0 && (
+                  <View style={styles.modalDesignsSection}>
+                    <Text style={styles.modalDesignsTitle}>
+                      {selectedItem.type === 'designer' ? 'TASARIMLARIM' : 'KOLEKSİYONLARIM'}
+                    </Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {selectedItem.designs.map((design, idx) => (
+                        <TouchableOpacity key={idx} style={styles.modalDesignCard}>
+                          <Image source={{ uri: design.image }} style={styles.modalDesignImage} />
+                          <Text style={styles.modalDesignTitle}>{design.title}</Text>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
                 
-                <Text style={styles.sectionTitle}>Öne Çıkan Ürünler</Text>
-                <View style={styles.productsGrid}>
-                  {selectedDesigner.products?.map((product) => (
-                    <TouchableOpacity key={product.id} style={styles.productCard}>
-                      <Image 
-                        source={{ uri: product.image }} 
-                        style={styles.productImage} 
-                      />
-                      <Text style={styles.productName}>{product.name}</Text>
-                      <Text style={styles.productPrice}>₺{product.price}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
+                <TouchableOpacity 
+                  style={[styles.modalFollowButton, following.includes(selectedItem.id) && styles.modalFollowButtonActive]}
+                  onPress={() => {
+                    handleFollow(selectedItem.id);
+                    setSelectedItem(null);
+                  }}
+                >
+                  <Text style={[styles.modalFollowText, following.includes(selectedItem.id) && styles.modalFollowTextActive]}>
+                    {following.includes(selectedItem.id) ? 'TAKİP EDİLİYOR' : 'TAKİP ET'}
+                  </Text>
+                </TouchableOpacity>
               </View>
             </ScrollView>
           </View>
@@ -460,36 +662,49 @@ const TasarimcimScreen = () => {
     );
   };
 
-  // ✅ 3 ÇİZGİ MENÜ MODALI
-  const HamburgerMenu = () => (
-    <Modal
-      visible={showMenu}
-      transparent={true}
-      animationType="fade"
-      onRequestClose={() => setShowMenu(false)}
-    >
-      <TouchableOpacity 
-        style={styles.menuOverlay}
-        activeOpacity={1}
-        onPress={() => setShowMenu(false)}
-      >
-        <View style={styles.menuContainer}>
-          <View style={styles.menuHeader}>
-            <Text style={styles.menuTitle}>Menü</Text>
-            <TouchableOpacity onPress={() => setShowMenu(false)}>
-              <Ionicons name="close" size={24} color={COLORS.charcoal} />
-            </TouchableOpacity>
-          </View>
-          
-          {menuItems.map((item) => (
-            <TouchableOpacity key={item.id} style={styles.menuItem}>
-              <Ionicons name={item.icon} size={22} color={COLORS.ash} />
-              <Text style={styles.menuItemText}>{item.name}</Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      </TouchableOpacity>
-    </Modal>
+  const ListHeader = () => (
+    <>
+      <AIConsultantCard navigation={navigation} />
+
+      <View style={styles.tabContainer}>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'designers' && styles.tabButtonActive]}
+          onPress={() => {
+            setActiveTab('designers');
+            setPage(1);
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+          }}
+        >
+          <Ionicons name="person" size={14} color={activeTab === 'designers' ? COLORS.white : COLORS.grayMedium} />
+          <Text style={[styles.tabButtonText, activeTab === 'designers' && styles.tabButtonTextActive]}>
+            TASARIMCILAR
+          </Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.tabButton, activeTab === 'brands' && styles.tabButtonActive]}
+          onPress={() => {
+            setActiveTab('brands');
+            setPage(1);
+            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+          }}
+        >
+          <Ionicons name="business" size={14} color={activeTab === 'brands' ? COLORS.white : COLORS.grayMedium} />
+          <Text style={[styles.tabButtonText, activeTab === 'brands' && styles.tabButtonTextActive]}>
+            MARKALAR
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      <CategoryFilters selectedCategory={selectedCategory} onSelectCategory={handleCategorySelect} />
+
+      <TrendingSection 
+        items={getTrendingItems()}
+        onPress={setSelectedItem}
+        onFollow={handleFollow}
+        following={following}
+        type={activeTab}
+      />
+    </>
   );
 
   return (
@@ -497,757 +712,685 @@ const TasarimcimScreen = () => {
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
       
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.menuButton}
-          onPress={() => setShowMenu(true)}
-        >
-          <Ionicons name="menu-outline" size={28} color={COLORS.charcoal} />
-        </TouchableOpacity>
-        
-        <View style={styles.headerCenter}>
-          <Text style={styles.title}>Tasarımcım</Text>
-          <Text style={styles.subtitle}>Markalar & Tasarımcılar</Text>
-        </View>
-        
-        <TouchableOpacity style={styles.notificationButton}>
-          <Ionicons name="notifications-outline" size={24} color={COLORS.charcoal} />
-          <View style={styles.notificationBadge} />
-        </TouchableOpacity>
+        <Text style={styles.logoText}>TASARIMCIM</Text>
       </View>
 
-      <ScrollView 
-        style={styles.mainScrollView}
-        showsVerticalScrollIndicator={true}
-        contentContainerStyle={styles.scrollContent}
-      >
-        <View style={styles.searchContainer}>
-          <View style={styles.searchBar}>
-            <Ionicons name="search-outline" size={20} color={COLORS.ash} />
-            <TextInput
-              style={styles.searchInput}
-              placeholder="Tasarımcı veya marka ara..."
-              placeholderTextColor={COLORS.ash}
-              value={searchQuery}
-              onChangeText={setSearchQuery}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={() => setSearchQuery('')}>
-                <Ionicons name="close-circle" size={18} color={COLORS.ash} />
-              </TouchableOpacity>
-            )}
-          </View>
+      <View style={styles.searchContainer}>
+        <View style={styles.searchBar}>
+          <Ionicons name="search-outline" size={16} color={COLORS.grayMedium} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Tasarımcı veya marka ara..."
+            placeholderTextColor={COLORS.grayMedium}
+            value={searchQuery}
+            onChangeText={(text) => {
+              setSearchQuery(text);
+              setPage(1);
+            }}
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={14} color={COLORS.grayMedium} />
+            </TouchableOpacity>
+          )}
         </View>
+      </View>
 
-        <AIConsultantCard />
-
-        <View style={styles.tabNavigation}>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'designers' && styles.activeTab]}
-            onPress={() => setActiveTab('designers')}
-          >
-            <Text style={[styles.tabText, activeTab === 'designers' && styles.activeTabText]}>
-              Tasarımcılar
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'brands' && styles.activeTab]}
-            onPress={() => setActiveTab('brands')}
-          >
-            <Text style={[styles.tabText, activeTab === 'brands' && styles.activeTabText]}>
-              Markalar
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.tabButton, activeTab === 'ai' && styles.activeTab]}
-            onPress={() => setActiveTab('ai')}
-          >
-            <Text style={[styles.tabText, activeTab === 'ai' && styles.activeTabText]}>
-              AI Danışman
-            </Text>
-          </TouchableOpacity>
-        </View>
-
-        {activeTab !== 'ai' && (
-          <ScrollView 
-            horizontal 
-            showsHorizontalScrollIndicator={false}
-            style={styles.categoriesScroll}
-          >
-            {categories.map((category) => (
-              <TouchableOpacity
-                key={category.id}
-                style={styles.categoryButton}
-              >
-                <Ionicons name={category.icon} size={16} color={COLORS.charcoal} />
-                <Text style={styles.categoryText}>{category.name}</Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+      <FlatList
+        ref={flatListRef}
+        data={displayData}
+        renderItem={({ item }) => (
+          <DesignerBrandCard
+            item={item}
+            onPress={setSelectedItem}
+            onFollow={handleFollow}
+            isFollowing={following.includes(item.id)}
+          />
         )}
+        keyExtractor={item => item.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.listContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.black} />}
+        onEndReached={loadMoreData}
+        onEndReachedThreshold={0.3}
+        ListHeaderComponent={ListHeader}
+        ListEmptyComponent={EmptyState}
+        ListFooterComponent={
+          isLoadingMore && (
+            <View style={styles.loadingMore}>
+              <ActivityIndicator size="small" color={COLORS.black} />
+              <Text style={styles.loadingMoreText}>YÜKLENİYOR...</Text>
+            </View>
+          )
+        }
+      />
 
-        {activeTab === 'ai' ? (
-          <AITabContent />
-        ) : (
-          <View style={styles.designersContainer}>
-            <FlatList
-              data={designersData.filter(item => 
-                activeTab === 'designers' ? item.type === 'designer' :
-                activeTab === 'brands' ? item.type === 'brand' :
-                designersData
-              )}
-              renderItem={({ item }) => <DesignerCard item={item} />}
-              keyExtractor={item => item.id}
-              numColumns={2}
-              columnWrapperStyle={styles.gridColumnWrapper}
-              contentContainerStyle={styles.designersGrid}
-              scrollEnabled={false}
-              showsVerticalScrollIndicator={false}
-            />
-          </View>
-        )}
-
-        <View style={styles.bottomPadding} />
-      </ScrollView>
-
-      <HamburgerMenu />
       <DesignerDetailModal />
     </SafeAreaView>
   );
 };
 
+// ============ STILLER ============
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.white 
   },
   
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
-    paddingTop: 15,
-    paddingBottom: 12,
-    backgroundColor: COLORS.white,
-    borderBottomWidth: 0.5,
-    borderBottomColor: COLORS.cloud,
-    position: 'relative',
+  header: { 
+    paddingHorizontal: SIZES.lg, 
+    paddingTop: Platform.OS === 'ios' ? 12 : SIZES.md, 
+    paddingBottom: SIZES.xs 
   },
-  menuButton: {
-    position: 'absolute',
-    left: 20,
-    top: 20,
-    padding: 8,
-    zIndex: 10,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '500',
-    color: COLORS.charcoal,
-    textAlign: 'center',
-    letterSpacing: 0.5,
-  },
-  subtitle: {
-    fontSize: 12,
-    color: COLORS.ash,
-    marginTop: 4,
-    textAlign: 'center',
-  },
-  notificationButton: {
-    position: 'absolute',
-    right: 20,
-    top: 20,
-    padding: 8,
-    zIndex: 10,
-  },
-  notificationBadge: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: '#FF3B30',
-  },
-  
-  mainScrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: 40,
-  },
-  
-  searchContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-  },
-  searchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.ivory,
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  searchInput: {
-    flex: 1,
-    marginLeft: 12,
-    marginRight: 8,
+  logoText: { 
+    ...TYPOGRAPHY.caption,
     fontSize: 16,
-    color: COLORS.charcoal,
-    padding: 0,
+    letterSpacing: 2,
   },
   
-  aiCard: {
-    backgroundColor: COLORS.accent,
-    borderRadius: 16,
-    marginHorizontal: 20,
-    marginBottom: 20,
-    overflow: 'hidden',
-    flexDirection: 'row',
-    padding: 16,
+  searchContainer: { 
+    paddingHorizontal: SIZES.lg, 
+    paddingVertical: SIZES.md 
   },
-  aiAvatar: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
-    borderColor: COLORS.white,
+  searchBar: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    paddingHorizontal: SIZES.md, 
+    paddingVertical: SIZES.sm 
   },
-  aiContent: {
-    flex: 1,
-    marginLeft: 16,
+  searchInput: { 
+    flex: 1, 
+    marginLeft: SIZES.sm, 
+    ...TYPOGRAPHY.body,
+    color: COLORS.black 
   },
-  aiHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
+  
+  listContent: { 
+    paddingBottom: 100 
   },
-  aiTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.white,
-    flex: 1,
+  
+  aiCard: { 
+    marginHorizontal: SIZES.lg, 
+    marginBottom: SIZES.lg, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    overflow: 'hidden' 
   },
-  aiBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-    gap: 4,
+  aiCoverImage: { 
+    width: '100%', 
+    height: 200, 
+    resizeMode: 'cover' 
   },
-  aiBadgeText: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.white,
+  aiOverlay: { 
+    ...StyleSheet.absoluteFillObject, 
+    backgroundColor: 'rgba(0,0,0,0.4)' 
   },
-  aiDescription: {
-    fontSize: 14,
-    color: COLORS.white,
-    opacity: 0.9,
-    marginBottom: 12,
-    lineHeight: 18,
+  aiContent: { 
+    padding: SIZES.md 
   },
-  aiFeatures: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 8,
-    marginBottom: 16,
+  aiHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    marginBottom: 4 
   },
-  featureTag: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  featureText: {
-    fontSize: 12,
-    color: COLORS.white,
-    fontWeight: '500',
-  },
-  aiStats: {
-    flexDirection: 'row',
-    backgroundColor: 'rgba(0,0,0,0.2)',
-    borderRadius: 12,
-    padding: 12,
-    marginBottom: 16,
-    justifyContent: 'space-around',
-  },
-  aiStat: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  statNumber: {
-    fontSize: 18,
-    fontWeight: 'bold',
-    color: COLORS.white,
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 12,
-    color: COLORS.white,
-    opacity: 0.8,
-  },
-  statDivider: {
-    width: 1,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-  },
-  aiButton: {
+  aiTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: COLORS.white,
-    paddingVertical: 12,
-    borderRadius: 12,
     gap: 8,
   },
-  aiButtonText: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.accent,
-  },
-  
-  aiTabContent: {
-    padding: 20,
-  },
-  aiWelcomeCard: {
-    backgroundColor: COLORS.ivory,
-    borderRadius: 20,
-    padding: 30,
-    alignItems: 'center',
-    marginBottom: 30,
-  },
-  aiWelcomeTitle: {
-    fontSize: 24,
-    fontWeight: '600',
-    color: COLORS.accent,
-    marginTop: 15,
-    marginBottom: 10,
-  },
-  aiWelcomeText: {
-    fontSize: 14,
-    color: COLORS.ash,
-    textAlign: 'center',
-    lineHeight: 20,
-  },
-  sampleQuestionsContainer: {
-    marginBottom: 30,
-  },
-  sampleQuestionsTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.charcoal,
-    marginBottom: 8,
-  },
-  sampleQuestionsSubtitle: {
-    fontSize: 14,
-    color: COLORS.ash,
-    marginBottom: 20,
-  },
-  questionsGrid: {
-    gap: 12,
-  },
-  questionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    padding: 16,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: COLORS.cloud,
-    gap: 12,
-  },
-  questionIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.ivory,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  questionText: {
-    flex: 1,
-    fontSize: 14,
-    color: COLORS.charcoal,
-  },
-  startChatButton: {
-    backgroundColor: COLORS.accent,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: 18,
-    borderRadius: 12,
-    gap: 10,
-    marginBottom: 30,
-  },
-  startChatText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.white,
-  },
-  aiStatsCard: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.ivory,
-    borderRadius: 12,
-    padding: 16,
-    justifyContent: 'space-around',
-  },
-  aiStatItem: {
-    alignItems: 'center',
-    flex: 1,
-  },
-  aiStatNumber: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.accent,
-    marginBottom: 4,
-  },
-  aiStatLabel: {
-    fontSize: 12,
-    color: COLORS.ash,
-  },
-  aiStatDivider: {
-    width: 1,
-    backgroundColor: COLORS.cloud,
-  },
-  
-  tabNavigation: {
-    flexDirection: 'row',
-    backgroundColor: COLORS.white,
-    marginHorizontal: 20,
-    marginBottom: 16,
-    borderRadius: 10,
-    padding: 4,
-    borderWidth: 1,
-    borderColor: COLORS.cloud,
-  },
-  tabButton: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: 12,
-    borderRadius: 8,
-  },
-  activeTab: {
-    backgroundColor: COLORS.ivory,
-  },
-  tabText: {
-    fontSize: 14,
-    fontWeight: '300',
-    color: COLORS.ash,
-  },
-  activeTabText: {
-    color: COLORS.accent,
-    fontWeight: '500',
-  },
-  
-  categoriesScroll: {
-    paddingHorizontal: 20,
-    marginBottom: 16,
-  },
-  categoryButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 20,
-    marginRight: 8,
-    borderWidth: 1,
-    borderColor: COLORS.cloud,
-    gap: 6,
-  },
-  categoryText: {
-    fontSize: 14,
-    fontWeight: '300',
-    color: COLORS.charcoal,
-  },
-  
-  designersContainer: {
-    minHeight: 600,
-  },
-  designersGrid: {
-    paddingHorizontal: 16,
-    paddingBottom: 20,
-  },
-  gridColumnWrapper: {
-    justifyContent: 'space-between',
-    marginBottom: 16,
-  },
-  
-  designerCard: {
-    width: (width - 48) / 2,
-    backgroundColor: COLORS.white,
-    borderRadius: 12,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: COLORS.cloud,
-    marginBottom: 8,
-  },
-  cardHeader: {
-    position: 'relative',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  designerAvatar: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    borderWidth: 2,
-    borderColor: COLORS.accent,
-  },
-  verificationBadge: {
-    position: 'absolute',
-    bottom: 0,
-    right: 0,
-  },
-  cardContent: {
-    flex: 1,
-  },
-  nameRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  designerName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.charcoal,
-    flex: 1,
-  },
-  typeBadge: {
-    backgroundColor: COLORS.ivory,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  typeText: {
-    fontSize: 12,
-    color: COLORS.ash,
-  },
-  designerTitle: {
-    fontSize: 12,
-    color: COLORS.ash,
-    marginBottom: 8,
-  },
-  designerStats: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  stat: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  statText: {
-    fontSize: 12,
-    color: COLORS.ash,
-  },
-  designerLocation: {
+  aiTitle: { 
+    ...TYPOGRAPHY.caption,
     fontSize: 11,
-    color: COLORS.ash,
-    marginBottom: 12,
+    color: COLORS.white 
   },
-  followButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  aiBadge: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    borderWidth: 0.5,
+    borderColor: COLORS.white,
+    paddingHorizontal: SIZES.xs, 
+    paddingVertical: 2, 
+    gap: 2 
+  },
+  aiBadgeText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 8,
+    color: COLORS.white 
+  },
+  aiArrowContainer: {
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     justifyContent: 'center',
-    backgroundColor: COLORS.ivory,
-    paddingVertical: 8,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: COLORS.accent,
-    gap: 6,
-  },
-  followText: {
-    fontSize: 14,
-    color: COLORS.accent,
-    fontWeight: '500',
-  },
-  
-  bottomPadding: {
-    height: 40,
-  },
-  
-  menuOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  menuContainer: {
-    width: width * 0.7,
-    backgroundColor: COLORS.white,
-    height: '100%',
-    paddingTop: 60,
-    paddingHorizontal: 20,
-  },
-  menuHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 30,
-    paddingBottom: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cloud,
   },
-  menuTitle: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: COLORS.charcoal,
+  aiSlogan: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.white, 
+    opacity: 0.8, 
+    marginBottom: SIZES.md, 
+    fontStyle: 'italic' 
   },
-  menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cloud,
-    gap: 12,
+  aiStatsGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    gap: SIZES.sm, 
+    marginBottom: SIZES.md 
   },
-  menuItemText: {
-    fontSize: 16,
-    color: COLORS.charcoal,
+  aiStatCard: { 
+    flex: 1, 
+    minWidth: '22%', 
+    borderWidth: 0.5,
+    borderColor: 'rgba(255,255,255,0.3)',
+    padding: SIZES.xs, 
+    alignItems: 'center' 
   },
-  
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.8)',
+  aiStatIconBg: { 
+    width: 28, 
+    height: 28, 
+    backgroundColor: COLORS.white, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    marginBottom: 2 
   },
-  modalContainer: {
-    flex: 1,
-    backgroundColor: COLORS.white,
-    marginTop: 60,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    overflow: 'hidden',
+  aiStatNumber: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 10,
+    color: COLORS.white, 
+    marginBottom: 2 
   },
-  modalHeader: {
-    position: 'relative',
+  aiStatLabel: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 7,
+    color: COLORS.white, 
+    opacity: 0.7 
   },
-  modalCover: {
-    width: '100%',
-    height: 200,
-  },
-  closeButton: {
-    position: 'absolute',
-    top: 20,
-    right: 20,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    width: 40,
-    height: 40,
+  aiButton: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    backgroundColor: COLORS.cognac,
+    paddingVertical: SIZES.sm, 
+    gap: 4,
     borderRadius: 20,
-    justifyContent: 'center',
-    alignItems: 'center',
   },
-  modalProfile: {
-    position: 'absolute',
-    bottom: -30,
-    left: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
+  aiButtonText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.white 
   },
-  modalAvatar: {
+  
+  tabContainer: { 
+    flexDirection: 'row', 
+    marginHorizontal: SIZES.lg, 
+    marginBottom: SIZES.md, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight 
+  },
+  tabButton: { 
+    flex: 1, 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    paddingVertical: SIZES.sm, 
+    gap: 4, 
+    backgroundColor: COLORS.white 
+  },
+  tabButtonActive: { 
+    backgroundColor: COLORS.black 
+  },
+  tabButtonText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 10,
+    color: COLORS.grayMedium 
+  },
+  tabButtonTextActive: { 
+    color: COLORS.white 
+  },
+  
+  categoriesScroll: { 
+    marginBottom: SIZES.md 
+  },
+  categoriesContent: { 
+    paddingHorizontal: SIZES.lg, 
+    gap: SIZES.sm 
+  },
+  categoryChip: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    paddingHorizontal: SIZES.md, 
+    paddingVertical: 4, 
+    gap: 4 
+  },
+  categoryChipActive: { 
+    backgroundColor: COLORS.black,
+    borderColor: COLORS.black,
+  },
+  categoryChipText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium 
+  },
+  categoryChipTextActive: { 
+    color: COLORS.white 
+  },
+  
+  trendingSection: { 
+    marginBottom: SIZES.lg 
+  },
+  trendingHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: SIZES.lg, 
+    marginBottom: SIZES.md 
+  },
+  trendingTitle: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 10,
+  },
+  trendingScroll: { 
+    paddingLeft: SIZES.lg 
+  },
+  trendingCard: { 
+    width: 110, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    padding: SIZES.sm, 
+    marginRight: SIZES.sm, 
+    alignItems: 'center' 
+  },
+  trendingAvatar: { 
+    width: 48, 
+    height: 48, 
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    marginBottom: 4 
+  },
+  trendingName: { 
+    ...TYPOGRAPHY.bodySmall,
+    fontWeight: '500', 
+    marginBottom: 2, 
+    textAlign: 'center' 
+  },
+  trendingTitleText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 8,
+    color: COLORS.grayMedium, 
+    marginBottom: 4, 
+    textAlign: 'center' 
+  },
+  trendingTrend: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 2, 
+    marginBottom: 4 
+  },
+  trendingPercent: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 8,
+    color: COLORS.grayMedium 
+  },
+  trendingFollowBtn: { 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    paddingHorizontal: SIZES.sm, 
+    paddingVertical: 2 
+  },
+  trendingFollowBtnActive: { 
+    backgroundColor: COLORS.black,
+    borderColor: COLORS.black,
+  },
+  trendingFollowBtnText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 7,
+    color: COLORS.black 
+  },
+  trendingFollowBtnTextActive: { 
+    color: COLORS.white 
+  },
+  
+  designerCard: { 
+    marginHorizontal: SIZES.lg, 
+    marginBottom: SIZES.md, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+  },
+  cardHeader: { 
+    flexDirection: 'row', 
+    padding: SIZES.md, 
+    gap: SIZES.md 
+  },
+  cardAvatar: { 
+    width: 48, 
+    height: 48, 
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    backgroundColor: COLORS.surface 
+  },
+  cardUserInfo: { 
+    flex: 1 
+  },
+  cardNameRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    flexWrap: 'wrap', 
+    gap: 4, 
+    marginBottom: 2 
+  },
+  cardName: { 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500', 
+  },
+  cardTypeBadge: { 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    paddingHorizontal: 4, 
+    paddingVertical: 1 
+  },
+  cardTypeBadgeText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 7,
+    color: COLORS.grayMedium 
+  },
+  cardTitle: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium, 
+    marginBottom: 4 
+  },
+  cardStats: { 
+    flexDirection: 'row', 
+    gap: SIZES.md 
+  },
+  cardStat: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 2 
+  },
+  cardStatText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 8,
+    color: COLORS.grayMedium 
+  },
+  followButton: { 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    paddingHorizontal: SIZES.md, 
+    paddingVertical: 4, 
+    alignSelf: 'flex-start' 
+  },
+  followButtonActive: { 
+    backgroundColor: COLORS.black,
+    borderColor: COLORS.black,
+  },
+  followButtonText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.black 
+  },
+  followButtonTextActive: { 
+    color: COLORS.white 
+  },
+  
+  designsSection: { 
+    paddingHorizontal: SIZES.md, 
+    paddingBottom: SIZES.md 
+  },
+  designsHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: SIZES.sm 
+  },
+  designsTitle: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+  },
+  designsSeeAll: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 8,
+    color: COLORS.grayMedium 
+  },
+  designsScroll: { 
+    flexDirection: 'row' 
+  },
+  designCard: { 
+    width: 120, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    overflow: 'hidden', 
+    marginRight: SIZES.sm, 
+    backgroundColor: COLORS.surface 
+  },
+  designImage: { 
+    width: 120, 
+    height: 100, 
+    resizeMode: 'cover' 
+  },
+  designOverlay: { 
+    position: 'absolute', 
+    bottom: 0, 
+    left: 0, 
+    right: 0, 
+    backgroundColor: 'rgba(0,0,0,0.6)', 
+    padding: 4 
+  },
+  designTitle: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 8,
+    color: COLORS.white, 
+    marginBottom: 2 
+  },
+  designStats: { 
+    flexDirection: 'row', 
+    gap: SIZES.sm 
+  },
+  designStat: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 2 
+  },
+  designStatText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 7,
+    color: COLORS.white 
+  },
+  
+  emptyContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    paddingTop: SIZES.xl, 
+    minHeight: 300 
+  },
+  emptyIconContainer: {
     width: 80,
     height: 80,
-    borderRadius: 40,
-    borderWidth: 4,
-    borderColor: COLORS.white,
-  },
-  modalProfileInfo: {
-    marginLeft: 16,
-    backgroundColor: 'rgba(255,255,255,0.9)',
-    padding: 12,
-    borderRadius: 12,
-    maxWidth: width * 0.6,
-  },
-  modalName: {
-    fontSize: 20,
-    fontWeight: 'bold',
-    color: COLORS.charcoal,
-    marginBottom: 4,
-  },
-  modalTitle: {
-    fontSize: 14,
-    color: COLORS.ash,
-  },
-  modalContent: {
-    padding: 20,
-    paddingTop: 40,
-  },
-  modalDescription: {
-    fontSize: 16,
-    color: COLORS.charcoal,
-    lineHeight: 24,
-    marginBottom: 20,
-  },
-  socialLinks: {
-    flexDirection: 'row',
-    gap: 12,
-    marginBottom: 30,
-  },
-  socialButton: {
-    flexDirection: 'row',
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.ivory,
-    paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 8,
-    gap: 8,
+    marginBottom: SIZES.lg,
   },
-  socialText: {
-    fontSize: 14,
-    color: COLORS.accent,
+  emptyTitle: { 
+    ...TYPOGRAPHY.caption,
+    marginTop: SIZES.sm, 
+    marginBottom: 4 
   },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.charcoal,
-    marginBottom: 16,
+  emptyText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium, 
+    textAlign: 'center', 
+    marginBottom: SIZES.lg 
   },
-  collectionCard: {
-    backgroundColor: COLORS.ivory,
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 12,
-    marginRight: 12,
-    marginBottom: 12,
+  clearButton: { 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight,
+    paddingHorizontal: SIZES.xl, 
+    paddingVertical: SIZES.sm 
   },
-  collectionName: {
-    fontSize: 14,
-    color: COLORS.charcoal,
+  clearButtonText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.black 
+  },
+  
+  loadingMore: { 
+    flexDirection: 'row', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    paddingVertical: SIZES.lg, 
+    gap: SIZES.sm 
+  },
+  loadingMoreText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium 
+  },
+  
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.8)' 
+  },
+  modalContainer: { 
+    flex: 1, 
+    backgroundColor: COLORS.white, 
+    marginTop: 60, 
+    overflow: 'hidden' 
+  },
+  modalHeader: { 
+    position: 'relative' 
+  },
+  modalCover: { 
+    width: '100%', 
+    height: 180 
+  },
+  closeButton: { 
+    position: 'absolute', 
+    top: SIZES.lg, 
+    right: SIZES.lg, 
+    backgroundColor: COLORS.black, 
+    width: 32, 
+    height: 32, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  modalProfile: { 
+    position: 'absolute', 
+    bottom: -24, 
+    left: SIZES.lg, 
+    flexDirection: 'row', 
+    alignItems: 'center' 
+  },
+  modalAvatar: { 
+    width: 64, 
+    height: 64, 
+    borderWidth: 2, 
+    borderColor: COLORS.white 
+  },
+  modalProfileInfo: { 
+    marginLeft: SIZES.md, 
+    backgroundColor: 'rgba(0,0,0,0.7)', 
+    padding: SIZES.sm, 
+    maxWidth: width * 0.6 
+  },
+  modalName: { 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500',
+    color: COLORS.white, 
+    marginBottom: 2 
+  },
+  modalTitle: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayLight 
+  },
+  modalContent: { 
+    padding: SIZES.lg, 
+    paddingTop: SIZES.xl 
+  },
+  modalDescription: { 
+    ...TYPOGRAPHY.bodySmall,
+    lineHeight: 18, 
+    marginBottom: SIZES.lg 
+  },
+  modalStats: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-around', 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    padding: SIZES.md, 
+    marginBottom: SIZES.lg 
+  },
+  modalStat: { 
+    alignItems: 'center', 
+    flex: 1 
+  },
+  modalStatNumber: { 
+    ...TYPOGRAPHY.body,
     fontWeight: '500',
   },
-  productsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
+  modalStatLabel: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 8,
+    color: COLORS.grayMedium, 
+    marginTop: 2 
   },
-  productCard: {
-    width: '48%',
-    marginBottom: 16,
+  modalStatDivider: { 
+    width: 0.5, 
+    backgroundColor: COLORS.grayLight 
   },
-  productImage: {
-    width: '100%',
-    height: 120,
-    borderRadius: 8,
-    backgroundColor: COLORS.ivory,
-    marginBottom: 8,
+  modalDesignsSection: { 
+    marginBottom: SIZES.lg 
   },
-  productName: {
-    fontSize: 14,
-    color: COLORS.charcoal,
-    marginBottom: 4,
+  modalDesignsTitle: { 
+    ...TYPOGRAPHY.caption,
+    marginBottom: SIZES.md 
   },
-  productPrice: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.accent,
+  modalDesignCard: { 
+    marginRight: SIZES.md, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    overflow: 'hidden', 
+    backgroundColor: COLORS.surface 
+  },
+  modalDesignImage: { 
+    width: 120, 
+    height: 140, 
+    resizeMode: 'cover' 
+  },
+  modalDesignTitle: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    padding: 4, 
+    textAlign: 'center' 
+  },
+  modalFollowButton: { 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight,
+    paddingVertical: SIZES.md, 
+    alignItems: 'center', 
+    marginTop: SIZES.sm 
+  },
+  modalFollowButtonActive: { 
+    backgroundColor: COLORS.black,
+    borderColor: COLORS.black,
+  },
+  modalFollowText: { 
+    ...TYPOGRAPHY.button,
+    color: COLORS.black 
+  },
+  modalFollowTextActive: { 
+    color: COLORS.white 
   },
 });
 

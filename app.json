@@ -1,25 +1,68 @@
 {
   "expo": {
-    "name": "ModaVerse",
-    "slug": "ModaVerse",
-    "version": "1.0.0",
+    "name": "ModaVerse AI",
+    "slug": "modaverse",
+    "version": "1.1.0",
     "orientation": "portrait",
+    "icon": "./assets/icon.png",
     "userInterfaceStyle": "light",
-    "assetBundlePatterns": ["**/*"],
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#FFFFFF"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
     "ios": {
-      "bundleIdentifier": "com.yusufhrsn12.modaverse"
+      "supportsTablet": true,
+      "bundleIdentifier": "com.modaverse.app",
+      "buildNumber": "2",
+      "infoPlist": {
+        "NSCameraUsageDescription": "ModaVerse gardırobuna ürün fotoğrafı eklemek için kameraya ihtiyaç duyar.",
+        "NSPhotoLibraryUsageDescription": "ModaVerse gardırobuna fotoğraf eklemek için galeri erişimine ihtiyaç duyar."
+      }
     },
     "android": {
-      "package": "com.yusufhrsn12.modaverse"
+      "package": "com.modaverse.app",
+      "versionCode": 2,
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.INTERNET",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.POST_NOTIFICATIONS"
+      ],
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#FFFFFF"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-image-picker",
-      "expo-camera",
-      "expo-font"
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "ModaVerse gardırobuna fotoğraf eklemek için galeri erişimine ihtiyaç duyar.",
+          "cameraPermission": "ModaVerse ürün fotoğrafı çekmek için kameraya ihtiyaç duyar."
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/notification-icon.png",
+          "color": "#6C5CE7",
+          "sounds": ["./assets/notification.wav"]
+        }
+      ]
     ],
+    "scheme": "modaverse",
     "extra": {
       "eas": {
-        "projectId": "e387e891-37bd-4b12-9955-b6ab366b103b"
+        "projectId": "a4c94240-e881-4275-bd2f-0551a52a12ee"
       }
     }
   }

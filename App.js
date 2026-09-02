@@ -1,21 +1,100 @@
-// 📁 App.js - v6 UYUMLU VERSİYON
-import React from 'react';
+// 📁 App.js - TAM REVİZE (API URL + Context Eklendi)
+import React, { useState, useEffect, createContext, useContext } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
-import { createNativeStackNavigator } from '@react-navigation/native-stack'; // v6 için bu import doğru
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
-import { COLORS, FONTS } from './src/constants/Theme';
+import * as SplashScreen from 'expo-splash-screen';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFonts } from 'expo-font';
+import { ActivityIndicator, View, StatusBar } from 'react-native';
 
-// Screen imports
+import { COLORS, TYPOGRAPHY } from './src/constants/Theme';
+
+// 🔥 Firebase
+import { auth } from './src/config/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+
+// 🆕 Firestore Servis
+import { loadLocalData, migrateDataToFirestore } from './src/services/firestoreService';
+
+// 🆕 API Servis (BACKEND BAĞLANTISI)
+import { API_URL, api } from './src/services/api';
+
+// ============================================================
+// 📌 ANA SAYFALAR (TAB'ler)
+// ============================================================
 import VitrinimScreen from './src/screens/VitrinimScreen';
 import PodiumScreen from './src/screens/PodiumScreen';
 import TasarimcimScreen from './src/screens/TasarimcimScreen';
 import KoleksiyonumScreen from './src/screens/KoleksiyonumScreen';
 import StilimScreen from './src/screens/StilimScreen';
+
+// ============================================================
+// 📌 VİTRİNİM SAYFALARI
+// ============================================================
+import FavoritesScreen from './src/screens/FavoritesScreen';
+import SavedScreen from './src/screens/SavedScreen';
+import SearchResultsScreen from './src/screens/SearchResultsScreen';
+import CategoriesScreen from './src/screens/CategoriesScreen';
+
+// ============================================================
+// 📌 PODYUM SAYFALARI
+// ============================================================
+import HashtagFeedScreen from './src/screens/HashtagFeedScreen';
+
+// ============================================================
+// 📌 KOLEKSİYONUM SAYFALARI
+// ============================================================
 import AddItemScreen from './src/screens/AddItemScreen';
+import WardrobeScreen from './src/screens/WardrobeScreen';
+
+// ============================================================
+// 📌 STİLİM SAYFALARI
+// ============================================================
+import OutfitSuggestionScreen from './src/screens/OutfitSuggestionScreen';
+import StyleDetailScreen from './src/screens/StyleDetailScreen';
+import WashAssistantScreen from './src/screens/WashAssistantScreen';
+import PostsGalleryScreen from './src/screens/PostsGalleryScreen';
+import FollowersScreen from './src/screens/FollowersScreen';
+import PostDetailScreen from './src/screens/PostDetailScreen';
+import IdentityGalleryScreen from './src/screens/IdentityGalleryScreen';
+import EditProfileScreen from './src/screens/EditProfileScreen';
+
+// ============================================================
+// 📌 ORTAK SAYFALAR
+// ============================================================
+import ProductDetailScreen from './src/screens/ProductDetailScreen';
+import CartScreen from './src/screens/CartScreen';
+import CheckoutScreen from './src/screens/CheckoutScreen';
+import OrdersScreen from './src/screens/OrdersScreen';
+
+// ============================================================
+// 📌 AUTH & ONBOARDING
+// ============================================================
+import OnboardingScreen from './src/screens/OnboardingScreen';
+import ProfileScreen from './src/screens/ProfileScreen';
+import AuthScreen from './src/screens/AuthScreen';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
+
+// ============================================================
+// 🆕 CONTEXT'LER
+// ============================================================
+
+// TEMA CONTEXT
+export const ThemeContext = createContext({ theme: 'light', toggleTheme: () => {} });
+
+// AUTH CONTEXT
+export const AuthContext = createContext({ user: null, loading: true });
+
+// 🆕 API CONTEXT (Backend bağlantısı için)
+export const ApiContext = createContext({
+  apiUrl: API_URL,
+  isConnected: true,
+  setConnected: () => {}
+});
 
 const getTabBarIcon = (routeName, focused) => {
   const icons = {
@@ -28,97 +107,424 @@ const getTabBarIcon = (routeName, focused) => {
   return icons[routeName] || 'square-outline';
 };
 
-// KOLEKSİYONUM STACK
-function KoleksiyonumStack() {
+// ============================================================
+// VİTRİNİM STACK
+// ============================================================
+function VitrinimStack() {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="KoleksiyonumMain" component={KoleksiyonumScreen} />
+      <Stack.Screen name="VitrinimMain" component={VitrinimScreen} />
+      <Stack.Screen name="Favorites" component={FavoritesScreen} />
+      <Stack.Screen name="Saved" component={SavedScreen} />
+      <Stack.Screen name="SearchResults" component={SearchResultsScreen} />
+      <Stack.Screen name="Categories" component={CategoriesScreen} />
       <Stack.Screen 
-        name="AddItem" 
-        component={AddItemScreen}
-        options={{ 
+        name="ProductDetail" 
+        component={ProductDetailScreen}
+        options={{
           headerShown: true,
-          title: 'YENİ KIYAFET EKLE',
-          headerStyle: { backgroundColor: COLORS.cognac },
-          headerTintColor: COLORS.white,
-          headerTitleStyle: {
-            fontWeight: '400',
-            letterSpacing: 1,
-            fontSize: 16,
-          },
+          title: 'ÜRÜN DETAYI',
+          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerTintColor: isDark ? COLORS.white : COLORS.black,
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
         }}
       />
     </Stack.Navigator>
   );
 }
 
-// DİĞER STACK'LER (header gösterilmeyecek)
-function VitrinimStack() {
-  return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
-      <Stack.Screen name="VitrinimMain" component={VitrinimScreen} />
-    </Stack.Navigator>
-  );
-}
-
+// ============================================================
+// PODYUM STACK
+// ============================================================
 function PodiumStack() {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="PodiumMain" component={PodiumScreen} />
+      <Stack.Screen name="HashtagFeed" component={HashtagFeedScreen} />
+      <Stack.Screen 
+        name="ProductDetail" 
+        component={ProductDetailScreen}
+        options={{
+          headerShown: true,
+          title: 'ÜRÜN DETAYI',
+          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerTintColor: isDark ? COLORS.white : COLORS.black,
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+        }}
+      />
     </Stack.Navigator>
   );
 }
 
+// ============================================================
+// TASARIMCIM STACK
+// ============================================================
 function TasarimcimStack() {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="TasarimcimMain" component={TasarimcimScreen} />
+      <Stack.Screen 
+        name="ProductDetail" 
+        component={ProductDetailScreen}
+        options={{
+          headerShown: true,
+          title: 'ÜRÜN DETAYI',
+          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerTintColor: isDark ? COLORS.white : COLORS.black,
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+        }}
+      />
     </Stack.Navigator>
   );
 }
 
+// ============================================================
+// KOLEKSİYONUM STACK
+// ============================================================
+function KoleksiyonumStack() {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="KoleksiyonumMain" component={KoleksiyonumScreen} />
+      <Stack.Screen name="AddItem" component={AddItemScreen} />
+      <Stack.Screen name="Wardrobe" component={WardrobeScreen} />
+      <Stack.Screen 
+        name="ProductDetail" 
+        component={ProductDetailScreen}
+        options={{
+          headerShown: true,
+          title: 'ÜRÜN DETAYI',
+          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerTintColor: isDark ? COLORS.white : COLORS.black,
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+// ============================================================
+// STİLİM STACK
+// ============================================================
 function StilimStack() {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="StilimMain" component={StilimScreen} />
+      <Stack.Screen name="PostsGallery" component={PostsGalleryScreen} />
+      <Stack.Screen name="Followers" component={FollowersScreen} />
+      <Stack.Screen name="PostDetail" component={PostDetailScreen} />
+      <Stack.Screen name="IdentityGallery" component={IdentityGalleryScreen} />
+      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+      <Stack.Screen name="OutfitSuggestion" component={OutfitSuggestionScreen} />
+      <Stack.Screen name="StyleDetail" component={StyleDetailScreen} />
+      <Stack.Screen name="WashAssistant" component={WashAssistantScreen} />
+      <Stack.Screen 
+        name="ProductDetail" 
+        component={ProductDetailScreen}
+        options={{
+          headerShown: true,
+          title: 'ÜRÜN DETAYI',
+          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerTintColor: isDark ? COLORS.white : COLORS.black,
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+        }}
+      />
     </Stack.Navigator>
   );
 }
 
-export default function App() {
+// ============================================================
+// PROFİL STACK
+// ============================================================
+function ProfileStack() {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  
   return (
-    <NavigationContainer>
-      <Tab.Navigator
-        initialRouteName="Vitrinim"
-        screenOptions={({ route }) => ({
-          tabBarIcon: ({ focused, color, size }) => {
-            const iconName = getTabBarIcon(route.name, focused);
-            return <Ionicons name={iconName} size={size} color={color} />;
-          },
-          tabBarActiveTintColor: COLORS.charcoal,
-          tabBarInactiveTintColor: COLORS.silver,
-          tabBarStyle: {
-            backgroundColor: COLORS.white,
-            borderTopWidth: 0.5,
-            borderTopColor: COLORS.cloud,
-            height: 60,
-            paddingBottom: 10,
-            paddingTop: 10,
-          },
-          tabBarLabelStyle: {
-            fontSize: 10,
-            fontWeight: '400',
-            letterSpacing: 0.5,
-          },
-          headerShown: false,
-        })}
-      >
-        <Tab.Screen name="Vitrinim" component={VitrinimStack} options={{ tabBarLabel: 'VİTRİN' }} />
-        <Tab.Screen name="Podyum" component={PodiumStack} options={{ tabBarLabel: 'PODYUM' }} />
-        <Tab.Screen name="Tasarımcım" component={TasarimcimStack} options={{ tabBarLabel: 'TASARIMCI' }} />
-        <Tab.Screen name="Koleksiyonum" component={KoleksiyonumStack} options={{ tabBarLabel: 'KOLEKSİYON' }} />
-        <Tab.Screen name="Stilim" component={StilimStack} options={{ tabBarLabel: 'STİLİM' }} />
-      </Tab.Navigator>
-    </NavigationContainer>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="ProfileMain" component={ProfileScreen} />
+      <Stack.Screen 
+        name="Orders" 
+        component={OrdersScreen}
+        options={{
+          headerShown: true,
+          title: 'SİPARİŞLERİM',
+          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerTintColor: isDark ? COLORS.white : COLORS.black,
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+// ============================================================
+// ANA MAIN STACK
+// ============================================================
+function MainStack() {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="MainTabs" component={MainTabs} />
+      <Stack.Screen 
+        name="Checkout" 
+        component={CheckoutScreen}
+        options={{
+          headerShown: true,
+          title: 'ÖDEME',
+          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerTintColor: isDark ? COLORS.white : COLORS.black,
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+        }}
+      />
+      <Stack.Screen 
+        name="Cart" 
+        component={CartScreen}
+        options={{
+          headerShown: true,
+          title: 'SEPETİM',
+          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerTintColor: isDark ? COLORS.white : COLORS.black,
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+// ============================================================
+// ANA TAB BAR
+// ============================================================
+function MainTabs() {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  
+  return (
+    <Tab.Navigator
+      initialRouteName="Vitrinim"
+      screenOptions={({ route }) => ({
+        tabBarIcon: ({ focused, color, size }) => {
+          const iconName = getTabBarIcon(route.name, focused);
+          return <Ionicons name={iconName} size={size} color={color} />;
+        },
+        tabBarActiveTintColor: isDark ? COLORS.white : COLORS.black,
+        tabBarInactiveTintColor: COLORS.grayMedium,
+        tabBarStyle: {
+          backgroundColor: isDark ? COLORS.black : COLORS.white,
+          borderTopWidth: 0.5,
+          borderTopColor: COLORS.grayLight,
+          height: 56,
+          paddingBottom: 8,
+          paddingTop: 8,
+        },
+        tabBarLabelStyle: { ...TYPOGRAPHY.caption, fontSize: 9, letterSpacing: 0.5 },
+        headerShown: false,
+      })}
+    >
+      <Tab.Screen name="Vitrinim" component={VitrinimStack} options={{ tabBarLabel: 'VİTRİN' }} />
+      <Tab.Screen name="Podyum" component={PodiumStack} options={{ tabBarLabel: 'PODYUM' }} />
+      <Tab.Screen name="Tasarımcım" component={TasarimcimStack} options={{ tabBarLabel: 'TASARIMCI' }} />
+      <Tab.Screen name="Koleksiyonum" component={KoleksiyonumStack} options={{ tabBarLabel: 'KOLEKSİYON' }} />
+      <Tab.Screen name="Stilim" component={StilimStack} options={{ tabBarLabel: 'STİLİM' }} />
+    </Tab.Navigator>
+  );
+}
+
+// ============================================================
+// AUTH LOADING EKRANI
+// ============================================================
+const AppLoading = () => (
+  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.white }}>
+    <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+    <ActivityIndicator size="large" color={COLORS.black} />
+  </View>
+);
+
+// ============================================================
+// ROOT STACK
+// ============================================================
+function RootStack() {
+  const { user, loading } = useContext(AuthContext);
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+
+  if (loading) {
+    return <AppLoading />;
+  }
+
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      {!user ? (
+        <Stack.Screen name="Auth" component={AuthScreen} />
+      ) : (
+        <Stack.Screen name="Main" component={MainStack} />
+      )}
+    </Stack.Navigator>
+  );
+}
+
+// ============================================================
+// ANA APP BİLEŞENİ
+// ============================================================
+export default function App() {
+  const [appIsReady, setAppIsReady] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [theme, setTheme] = useState('light');
+  const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
+  const [dataMigrated, setDataMigrated] = useState(false);
+  const [isApiConnected, setIsApiConnected] = useState(true);
+
+  // FONTLARI YÜKLE
+  const [fontsLoaded, fontError] = useFonts({
+    'Inter-Regular': require('./assets/fonts/Inter-Regular.ttf'),
+    'Inter-Medium': require('./assets/fonts/Inter-Medium.ttf'),
+    'Inter-SemiBold': require('./assets/fonts/Inter-SemiBold.ttf'),
+    'Inter-Bold': require('./assets/fonts/Inter-Bold.ttf'),
+  });
+
+  // 🆕 API BAĞLANTI KONTROLÜ
+  useEffect(() => {
+    const checkApiConnection = async () => {
+      try {
+        const response = await fetch(`${API_URL}/health`);
+        if (response.ok) {
+          setIsApiConnected(true);
+          console.log('✅ Backend bağlantısı başarılı!');
+        } else {
+          setIsApiConnected(false);
+          console.warn('⚠️ Backend bağlantısı başarısız!');
+        }
+      } catch (error) {
+        setIsApiConnected(false);
+        console.error('❌ Backend bağlantı hatası:', error.message);
+      }
+    };
+    checkApiConnection();
+  }, []);
+
+  // FIREBASE AUTH STATE
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setAuthLoading(false);
+      console.log("🔥 Firebase Auth:", currentUser ? `Giriş yapan: ${currentUser.email}` : "Giriş yapılmadı");
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // ASYNCSTORAGE → FIRESTORE VERİ TAŞIMA
+  useEffect(() => {
+    const migrateData = async () => {
+      if (user && !dataMigrated) {
+        try {
+          console.log('🔄 Veri taşıma başlatılıyor...');
+          const localData = await loadLocalData();
+          
+          if (localData) {
+            const hasData = localData.profile || 
+                           (localData.products && localData.products.length > 0) || 
+                           (localData.favorites && localData.favorites.length > 0) || 
+                           (localData.cart && localData.cart.length > 0);
+            
+            if (hasData) {
+              console.log('📦 Local veri bulundu, Firestore\'a taşınıyor...');
+              const result = await migrateDataToFirestore(user.uid, localData);
+              
+              if (result.success) {
+                console.log('✅ Veriler Firestore\'a başarıyla taşındı!');
+                setDataMigrated(true);
+              } else {
+                console.log('❌ Veri taşıma hatası:', result.error);
+              }
+            } else {
+              console.log('ℹ️ Taşınacak local veri bulunamadı.');
+              setDataMigrated(true);
+            }
+          }
+        } catch (error) {
+          console.error('Veri taşıma işlemi sırasında hata:', error);
+        }
+      }
+    };
+    
+    migrateData();
+  }, [user, dataMigrated]);
+
+  // APP HAZIRLAMA
+  useEffect(() => {
+    async function prepare() {
+      try {
+        await SplashScreen.preventAutoHideAsync();
+        
+        const hasSeenOnboarding = await AsyncStorage.getItem('@has_seen_onboarding');
+        if (!hasSeenOnboarding) {
+          setShowOnboarding(true);
+        }
+        
+        const savedTheme = await AsyncStorage.getItem('@app_theme');
+        if (savedTheme) {
+          setTheme(savedTheme);
+        }
+        
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        setAppIsReady(true);
+        await SplashScreen.hideAsync();
+      }
+    }
+    prepare();
+  }, []);
+
+  const toggleTheme = async () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    await AsyncStorage.setItem('@app_theme', newTheme);
+  };
+
+  const handleOnboardingComplete = async () => {
+    await AsyncStorage.setItem('@has_seen_onboarding', 'true');
+    setShowOnboarding(false);
+  };
+
+  // FONTLAR YÜKLENMEDİYSE
+  if ((!fontsLoaded && !fontError) || !appIsReady) {
+    return <AppLoading />;
+  }
+
+  // ONBOARDING GÖSTER
+  if (showOnboarding) {
+    return <OnboardingScreen onComplete={handleOnboardingComplete} />;
+  }
+
+  // ANA UYGULAMA
+  return (
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+      <AuthContext.Provider value={{ user, loading: authLoading }}>
+        <ApiContext.Provider value={{ apiUrl: API_URL, isConnected: isApiConnected, setConnected: setIsApiConnected }}>
+          <NavigationContainer>
+            <RootStack />
+          </NavigationContainer>
+        </ApiContext.Provider>
+      </AuthContext.Provider>
+    </ThemeContext.Provider>
   );
 }

@@ -1,5 +1,5 @@
-// 📁 src/screens/ProductDetailScreen.js - SADECE HATALAR DÜZELTİLDİ
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+// 📁 src/screens/ProductDetailScreen.js - REVİZE (Geri Butonu Kaldırıldı, Header Tamamen Kaldırıldı)
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { 
   ScrollView, 
   View, 
@@ -11,570 +11,796 @@ import {
   ActivityIndicator,
   Dimensions,
   Alert,
-  Platform
+  Image,
+  FlatList,
+  Platform,
+  Animated
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { COLORS, TYPOGRAPHY, SIZES } from '../constants/Theme';
 
-// 📏 Ekran boyutları
 const { width, height } = Dimensions.get('window');
 
-// 🎨 Renk paleti (App.js ile uyumlu - cognac düzeltildi)
-const COLORS = {
-  white: '#FFFFFF',
-  ivory: '#F9F6F2',
-  paper: '#F5F3EF',
-  cloud: '#F0F0F0',
-  mist: '#E8E8E8',
-  ash: '#888888',
-  charcoal: '#222222',
-  noir: '#000000',
-  cognac: '#8C7853',  // ✅ DÜZELTİLDİ
-  porcelain: '#FAFAFA',
-  accent: '#8C7853',
-  success: '#4CAF50',
-  warning: '#FF9800',
-  error: '#F44336',
-  like: '#E91E63',
+const STORAGE_KEYS = {
+  FAVORITES: '@user_favorites',
+  CART: '@user_cart',
 };
 
-// ✅ MOCK FAVORİTE FUNCTIONS (Context olmadan çalışsın)
-const useFavorites = () => {
-  const [favoriteIds, setFavoriteIds] = useState([]);
-  
-  const toggleFavorite = useCallback((product) => {
-    setFavoriteIds(prev => 
-      prev.includes(product.id) 
-        ? prev.filter(id => id !== product.id)
-        : [...prev, product.id]
-    );
+// ============ ÜRÜN GALERİSİ BİLEŞENİ ============
+const ProductGallery = ({ images, onFavoritePress, isFavorite }) => {
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const flatListRef = useRef(null);
+  const [currentIndex, setCurrentIndex] = useState(0);
+
+  const onScroll = Animated.event(
+    [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+    { useNativeDriver: false }
+  );
+
+  const onViewableItemsChanged = useCallback(({ viewableItems }) => {
+    if (viewableItems.length > 0) {
+      setCurrentIndex(viewableItems[0].index || 0);
+    }
   }, []);
-  
-  const isFavorite = useCallback((id) => favoriteIds.includes(id), [favoriteIds]);
-  
-  return { toggleFavorite, isFavorite };
+
+  const viewabilityConfig = { viewAreaCoveragePercentThreshold: 50 };
+
+  return (
+    <View style={styles.galleryContainer}>
+      <FlatList
+        ref={flatListRef}
+        horizontal
+        pagingEnabled
+        data={images}
+        renderItem={({ item }) => (
+          <Image source={{ uri: item }} style={styles.galleryImage} />
+        )}
+        keyExtractor={(item, index) => index.toString()}
+        showsHorizontalScrollIndicator={false}
+        onScroll={onScroll}
+        onViewableItemsChanged={onViewableItemsChanged}
+        viewabilityConfig={viewabilityConfig}
+      />
+      
+      {/* Pagination Dots */}
+      <View style={styles.paginationContainer}>
+        {images.map((_, index) => (
+          <View
+            key={index}
+            style={[
+              styles.paginationDot,
+              currentIndex === index && styles.paginationDotActive
+            ]}
+          />
+        ))}
+      </View>
+      
+      <TouchableOpacity style={styles.favoriteButton} onPress={onFavoritePress}>
+        <Ionicons 
+          name={isFavorite ? "heart" : "heart-outline"} 
+          size={18} 
+          color={isFavorite ? COLORS.black : COLORS.white} 
+        />
+      </TouchableOpacity>
+    </View>
+  );
 };
 
-// ✅ MOCK COMPONENTS (eksik dosyalar için)
-const ProductGallery = ({ product, onFavoritePress, isFavorite }) => (
-  <View style={styles.placeholder}>
-    <Text style={styles.placeholderText}>Galeri: {product.name}</Text>
-    <TouchableOpacity onPress={onFavoritePress}>
-      <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={24} color={isFavorite ? COLORS.like : COLORS.ash} />
-    </TouchableOpacity>
-  </View>
-);
+// ============ ÜRÜN BİLGİLERİ BİLEŞENİ ============
+const ProductInfo = ({ product }) => {
+  const formatPrice = (price) => {
+    return Math.round(price).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  };
 
-const ProductInfo = ({ product }) => (
-  <View style={styles.productInfoContainer}>
-    <Text style={styles.brand}>{product.brand}</Text>
-    <Text style={styles.productName}>{product.name}</Text>
-    <View style={styles.priceRow}>
-      <Text style={styles.price}>₺{product.price}</Text>
-      {product.originalPrice && (
-        <Text style={styles.originalPrice}>₺{product.originalPrice}</Text>
-      )}
+  return (
+    <View style={styles.productInfoContainer}>
+      <View style={styles.brandContainer}>
+        <Text style={styles.brand}>{product.brand}</Text>
+        {product.isNew && (
+          <View style={styles.newBadge}>
+            <Text style={styles.newBadgeText}>YENİ</Text>
+          </View>
+        )}
+      </View>
+      <Text style={styles.productName}>{product.name}</Text>
+      
+      <View style={styles.priceRow}>
+        <Text style={styles.price}>₺{formatPrice(product.price)}</Text>
+        {product.originalPrice && (
+          <Text style={styles.originalPrice}>₺{formatPrice(product.originalPrice)}</Text>
+        )}
+      </View>
+      
+      <Text style={styles.description}>{product.description}</Text>
+      
+      <View style={styles.ratingContainer}>
+        <View style={styles.stars}>
+          {[1, 2, 3, 4, 5].map((star) => (
+            <Ionicons 
+              key={star} 
+              name="star" 
+              size={12} 
+              color={star <= (product.rating || 4.8) ? COLORS.black : COLORS.grayLight} 
+            />
+          ))}
+        </View>
+        <Text style={styles.ratingText}>
+          {product.rating || 4.8} ({product.reviews || 128} DEĞERLENDİRME)
+        </Text>
+      </View>
+      
+      <View style={styles.divider} />
+      
+      <View style={styles.detailsRow}>
+        <View style={styles.detailItem}>
+          <Ionicons name="shirt-outline" size={14} color={COLORS.grayMedium} />
+          <Text style={styles.detailText}>{product.category || 'GİYİM'}</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Ionicons name="water-outline" size={14} color={COLORS.grayMedium} />
+          <Text style={styles.detailText}>{product.material || 'PAMUK'}</Text>
+        </View>
+        <View style={styles.detailItem}>
+          <Ionicons name="resize-outline" size={14} color={COLORS.grayMedium} />
+          <Text style={styles.detailText}>{product.fit || 'REGULAR'}</Text>
+        </View>
+      </View>
     </View>
-    <Text style={styles.description}>{product.description}</Text>
-  </View>
-);
+  );
+};
 
-const SizeSelector = ({ onSizeSelect, sizes, selectedSize }) => (
-  <View style={styles.sizeContainer}>
-    <Text style={styles.sectionTitle}>Beden Seçimi</Text>
+// ============ BEDEN SEÇİCİ BİLEŞENİ ============
+const SizeSelector = ({ sizes, selectedSize, onSelect }) => (
+  <View style={styles.sectionContainer}>
+    <Text style={styles.sectionTitle}>BEDEN SEÇİMİ</Text>
     <View style={styles.sizeList}>
       {sizes.map(size => (
         <TouchableOpacity
           key={size}
           style={[styles.sizeButton, selectedSize === size && styles.sizeButtonActive]}
-          onPress={() => onSizeSelect(size)}
+          onPress={() => onSelect(size)}
         >
           <Text style={[styles.sizeText, selectedSize === size && styles.sizeTextActive]}>{size}</Text>
         </TouchableOpacity>
       ))}
     </View>
+    {!selectedSize && (
+      <Text style={styles.warningText}>LÜTFEN BİR BEDEN SEÇİN</Text>
+    )}
   </View>
 );
 
-const AddToCartButton = ({ product, selectedSize, quantity, onPress }) => (
-  <TouchableOpacity 
-    style={[styles.addToCartButton, !selectedSize && styles.addToCartDisabled]}
-    onPress={onPress}
-    disabled={!selectedSize}
-  >
-    <Text style={styles.addToCartText}>Sepete Ekle - ₺{product.price * quantity}</Text>
-  </TouchableOpacity>
+// ============ MİKTAR SEÇİCİ BİLEŞENİ ============
+const QuantitySelector = ({ quantity, onIncrease, onDecrease, maxStock }) => (
+  <View style={styles.sectionContainer}>
+    <Text style={styles.sectionTitle}>MİKTAR</Text>
+    <View style={styles.quantityContainer}>
+      <TouchableOpacity 
+        style={[styles.quantityButton, quantity <= 1 && styles.quantityButtonDisabled]}
+        onPress={onDecrease}
+        disabled={quantity <= 1}
+      >
+        <Ionicons name="remove" size={14} color={quantity <= 1 ? COLORS.grayMedium : COLORS.black} />
+      </TouchableOpacity>
+      
+      <Text style={styles.quantityText}>{quantity}</Text>
+      
+      <TouchableOpacity 
+        style={[styles.quantityButton, quantity >= maxStock && styles.quantityButtonDisabled]}
+        onPress={onIncrease}
+        disabled={quantity >= maxStock}
+      >
+        <Ionicons name="add" size={14} color={quantity >= maxStock ? COLORS.grayMedium : COLORS.black} />
+      </TouchableOpacity>
+    </View>
+    <Text style={styles.stockText}>STOKTA {maxStock} ADET</Text>
+  </View>
 );
 
+// ============ TESLİMAT BİLGİSİ BİLEŞENİ ============
+const DeliveryInfo = () => (
+  <View style={styles.deliveryContainer}>
+    <View style={styles.deliveryItem}>
+      <View style={styles.deliveryIcon}>
+        <Ionicons name="cube-outline" size={14} color={COLORS.black} />
+      </View>
+      <View>
+        <Text style={styles.deliveryTitle}>ÜCRETSİZ KARGO</Text>
+        <Text style={styles.deliverySubtext}>250 TL ve üzeri siparişlerde</Text>
+      </View>
+    </View>
+    <View style={styles.deliveryItem}>
+      <View style={styles.deliveryIcon}>
+        <Ionicons name="calendar-outline" size={14} color={COLORS.black} />
+      </View>
+      <View>
+        <Text style={styles.deliveryTitle}>HIZLI TESLİMAT</Text>
+        <Text style={styles.deliverySubtext}>1-3 iş günü</Text>
+      </View>
+    </View>
+    <View style={styles.deliveryItem}>
+      <View style={styles.deliveryIcon}>
+        <Ionicons name="swap-horizontal-outline" size={14} color={COLORS.black} />
+      </View>
+      <View>
+        <Text style={styles.deliveryTitle}>KOLAY İADE</Text>
+        <Text style={styles.deliverySubtext}>14 gün iade garantisi</Text>
+      </View>
+    </View>
+  </View>
+);
+
+// ============ ANA BİLEŞEN ============
 const ProductDetailScreen = () => {
   const navigation = useNavigation();
   const route = useRoute();
   
-  const [selectedSize, setSelectedSize] = useState(null);
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [selectedSize, setSelectedSize] = useState(null);
   const [quantity, setQuantity] = useState(1);
-  const { toggleFavorite, isFavorite } = useFavorites();
-
-  // Ürün yükleme
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [cartCount, setCartCount] = useState(0);
+  
   useEffect(() => {
+    loadProduct();
+    loadCartCount();
+  }, []);
+  
+  const loadProduct = async () => {
     setLoading(true);
     
+    let currentProduct;
     if (route.params?.product) {
-      setProduct(route.params.product);
+      currentProduct = route.params.product;
     } else if (route.params?.productId) {
-      const mockProduct = {
-        id: route.params.productId || '1',
-        name: 'Minimalist Siyah Elbise',
-        brand: 'PRADA',
-        price: 2999,
-        originalPrice: 3999,
-        description: 'Premium kumaştan üretilmiş, minimalist tasarım siyah elbise. Özel günler için ideal.',
+      currentProduct = {
+        id: route.params.productId,
+        name: 'Oversize Blazer',
+        brand: 'ZARA',
+        price: 799,
+        originalPrice: 999,
+        description: 'Modern ve şık oversize blazer, iş toplantılarından günlük kombinlere kadar her ortamda tercih edebileceğiniz bir parça. Yün karışımı kumaşı ile rahat ve şık.',
+        image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400',
         images: [
-          'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=400',
-          'https://images.unsplash.com/photo-1569317002804-ab77bcf1bce4?w=400',
           'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400',
+          'https://images.unsplash.com/photo-1584273143981-41c073dfe8f8?w=400',
+          'https://images.unsplash.com/photo-1598808503746-f34c53b9323e?w=400',
         ],
-        fabric: 'Pamuk',
-        color: 'Siyah',
         sizes: ['XS', 'S', 'M', 'L', 'XL'],
         stock: 15,
         rating: 4.8,
-        reviews: 124,
-        category: 'Elbise',
-        season: 'Yaz',
-        careInstructions: '30°C yıkama, ütüleme yapmayın',
-        inStock: true,
+        reviews: 128,
+        category: 'Blazer',
+        material: 'Yün',
+        fit: 'Oversize',
+        isNew: true
       };
-      setProduct(mockProduct);
+    }
+    
+    setProduct(currentProduct);
+    
+    const favorites = await AsyncStorage.getItem(STORAGE_KEYS.FAVORITES);
+    if (favorites) {
+      const favList = JSON.parse(favorites);
+      setIsFavorite(favList.includes(currentProduct.id));
     }
     
     setLoading(false);
-  }, [route.params]);
-
-  const handleGoBack = useCallback(() => {
-    if (navigation && navigation.goBack) {
-      navigation.goBack();
+  };
+  
+  const loadCartCount = async () => {
+    const cart = await AsyncStorage.getItem(STORAGE_KEYS.CART);
+    if (cart) {
+      setCartCount(JSON.parse(cart).length);
     }
-  }, [navigation]);
-
-  const handleSizeSelect = useCallback((size) => {
-    setSelectedSize(size);
-  }, []);
-
-  const handleFavoritePress = useCallback(() => {
-    if (product) {
-      toggleFavorite(product);
-      Alert.alert(
-        isFavorite(product.id) ? '❤️ Favorilerden Çıkarıldı' : '❤️ Favorilere Eklendi',
-        `${product.name} ${isFavorite(product.id) ? 'favorilerden çıkarıldı' : 'favorilere eklendi'}.`
-      );
+  };
+  
+  const handleFavoritePress = async () => {
+    try {
+      const favorites = await AsyncStorage.getItem(STORAGE_KEYS.FAVORITES);
+      let favList = favorites ? JSON.parse(favorites) : [];
+      
+      if (isFavorite) {
+        favList = favList.filter(id => id !== product.id);
+        Alert.alert('Favorilerden Çıkarıldı', `${product.name} favorilerinizden çıkarıldı.`);
+      } else {
+        favList.push(product.id);
+        Alert.alert('Favorilere Eklendi', `${product.name} favorilerinize eklendi!`);
+      }
+      
+      await AsyncStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(favList));
+      setIsFavorite(!isFavorite);
+    } catch (error) {
+      console.error('Favori hatası:', error);
     }
-  }, [product, toggleFavorite, isFavorite]);
-
-  const increaseQuantity = useCallback(() => setQuantity(prev => prev + 1), []);
-  const decreaseQuantity = useCallback(() => setQuantity(prev => Math.max(1, prev - 1)), []);
-
-  const handleAddToCart = useCallback(() => {
+  };
+  
+  const handleAddToCart = async () => {
     if (!selectedSize) {
-      Alert.alert('Beden Seçin', 'Lütfen bir beden seçin.');
+      Alert.alert('Beden Seçimi', 'Lütfen bir beden seçin.');
       return;
     }
     
-    Alert.alert(
-      '🛒 Sepete Eklendi',
-      `${product.name} (${selectedSize}) - ${quantity} adet sepete eklendi.`,
-      [
-        { text: 'Alışverişe Devam Et', style: 'cancel' },
-        { text: 'Sepete Git', onPress: () => navigation.navigate('Sepet') }
-      ]
-    );
-  }, [product, selectedSize, quantity, navigation]);
-
-  const Header = useCallback(() => (
-    <View style={styles.header}>
-      <TouchableOpacity 
-        style={styles.headerButton}
-        onPress={handleGoBack}
-        hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-      >
-        <Ionicons name="chevron-back" size={24} color={COLORS.charcoal} />
-      </TouchableOpacity>
+    try {
+      const cart = await AsyncStorage.getItem(STORAGE_KEYS.CART);
+      let cartList = cart ? JSON.parse(cart) : [];
       
-      <View style={styles.headerRight}>
-        <TouchableOpacity 
-          style={styles.headerButton}
-          onPress={() => Alert.alert('Arama', 'Arama sayfası açılıyor...')}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="search-outline" size={24} color={COLORS.charcoal} />
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={styles.headerButton}
-          onPress={() => Alert.alert('Sepet', 'Sepet sayfası açılıyor...')}
-          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-        >
-          <Ionicons name="cart-outline" size={24} color={COLORS.charcoal} />
-          <View style={styles.cartBadge}>
-            <Text style={styles.cartBadgeText}>3</Text>
-          </View>
-        </TouchableOpacity>
-      </View>
-    </View>
-  ), [handleGoBack]);
-
+      const cartItem = {
+        id: `${product.id}_${selectedSize}_${Date.now()}`,
+        productId: product.id,
+        name: product.name,
+        brand: product.brand,
+        price: product.price,
+        image: product.images?.[0] || product.image,
+        size: selectedSize,
+        quantity: quantity,
+        addedAt: new Date().toISOString()
+      };
+      
+      cartList.push(cartItem);
+      await AsyncStorage.setItem(STORAGE_KEYS.CART, JSON.stringify(cartList));
+      setCartCount(cartList.length);
+      
+      Alert.alert(
+        'Sepete Eklendi!',
+        `${product.name} (${selectedSize}) - ${quantity} adet sepete eklendi.`,
+        [
+          { text: 'Alışverişe Devam Et', style: 'cancel' },
+          { text: 'Sepete Git', onPress: () => navigation.navigate('Cart') }
+        ]
+      );
+    } catch (error) {
+      console.error('Sepet hatası:', error);
+      Alert.alert('Hata', 'Ürün sepete eklenemedi');
+    }
+  };
+  
+  const handleGoBack = useCallback(() => {
+    navigation.goBack();
+  }, [navigation]);
+  
+  const increaseQuantity = () => {
+    if (product && quantity < product.stock) {
+      setQuantity(prev => prev + 1);
+    } else {
+      Alert.alert('Stok Bilgisi', 'Stokta yeterli ürün yok.');
+    }
+  };
+  
+  const decreaseQuantity = () => {
+    if (quantity > 1) {
+      setQuantity(prev => prev - 1);
+    }
+  };
+  
+  const formatPrice = (price) => {
+    return Math.round(price).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
+  };
+  
   if (loading) {
     return (
       <SafeAreaView style={styles.loadingContainer}>
         <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
-        <ActivityIndicator size="large" color={COLORS.cognac} />
-        <Text style={styles.loadingText}>Ürün yükleniyor...</Text>
+        <ActivityIndicator size="large" color={COLORS.black} />
+        <Text style={styles.loadingText}>YÜKLENİYOR...</Text>
       </SafeAreaView>
     );
   }
-
+  
   if (!product) {
     return (
       <SafeAreaView style={styles.errorContainer}>
         <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
-        <Ionicons name="alert-circle-outline" size={64} color={COLORS.error} />
-        <Text style={styles.errorTitle}>Ürün bulunamadı</Text>
+        <View style={styles.errorIconContainer}>
+          <Ionicons name="alert-circle-outline" size={40} color={COLORS.grayMedium} />
+        </View>
+        <Text style={styles.errorTitle}>ÜRÜN BULUNAMADI</Text>
         <Text style={styles.errorText}>İstediğiniz ürün mevcut değil.</Text>
         <TouchableOpacity style={styles.errorButton} onPress={handleGoBack}>
-          <Text style={styles.errorButtonText}>Geri Dön</Text>
+          <Text style={styles.errorButtonText}>GERİ DÖN</Text>
         </TouchableOpacity>
       </SafeAreaView>
     );
   }
-
+  
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
       
-      <Header />
-
+      {/* ✅ HEADER TAMAMEN KALDIRILDI - Geri butonu yok! */}
+      
       <ScrollView 
-        showsVerticalScrollIndicator={false}
+        showsVerticalScrollIndicator={false} 
         contentContainerStyle={styles.scrollContent}
       >
         <ProductGallery 
-          product={product} 
-          onFavoritePress={handleFavoritePress} 
-          isFavorite={isFavorite(product.id)} 
+          images={product.images || [product.image]} 
+          onFavoritePress={handleFavoritePress}
+          isFavorite={isFavorite}
         />
-
+        
         <ProductInfo product={product} />
-
-        <View style={styles.quantitySection}>
-          <Text style={styles.sectionTitle}>Miktar</Text>
-          <View style={styles.quantityContainer}>
-            <TouchableOpacity 
-              style={[styles.quantityButton, quantity <= 1 && styles.quantityButtonDisabled]}
-              onPress={decreaseQuantity}
-              disabled={quantity <= 1}
-            >
-              <Ionicons name="remove" size={20} color={quantity <= 1 ? COLORS.ash : COLORS.charcoal} />
-            </TouchableOpacity>
-            
-            <Text style={styles.quantityText}>{quantity}</Text>
-            
-            <TouchableOpacity 
-              style={[styles.quantityButton, product.stock && quantity >= product.stock && styles.quantityButtonDisabled]}
-              onPress={increaseQuantity}
-              disabled={product.stock && quantity >= product.stock}
-            >
-              <Ionicons name="add" size={20} color={(product.stock && quantity >= product.stock) ? COLORS.ash : COLORS.charcoal} />
-            </TouchableOpacity>
-          </View>
-          {product.stock && (
-            <Text style={styles.stockText}>{product.stock} adet stokta</Text>
-          )}
-        </View>
-
+        
+        <QuantitySelector 
+          quantity={quantity}
+          onIncrease={increaseQuantity}
+          onDecrease={decreaseQuantity}
+          maxStock={product.stock || 10}
+        />
+        
         <SizeSelector 
-          onSizeSelect={handleSizeSelect} 
           sizes={product.sizes || ['XS', 'S', 'M', 'L', 'XL']}
           selectedSize={selectedSize}
+          onSelect={setSelectedSize}
         />
-
-        <View style={styles.deliverySection}>
-          <View style={styles.deliveryItem}>
-            <Ionicons name="cube-outline" size={20} color={COLORS.cognac} />
-            <Text style={styles.deliveryText}>Ücretsiz kargo</Text>
-          </View>
-          <View style={styles.deliveryItem}>
-            <Ionicons name="calendar-outline" size={20} color={COLORS.cognac} />
-            <Text style={styles.deliveryText}>1-3 iş günü teslimat</Text>
-          </View>
-          <View style={styles.deliveryItem}>
-            <Ionicons name="swap-horizontal-outline" size={20} color={COLORS.cognac} />
-            <Text style={styles.deliveryText}>14 gün iade garantisi</Text>
-          </View>
-        </View>
+        
+        <DeliveryInfo />
       </ScrollView>
-
-      <View style={styles.fixedBottom}>
-        <AddToCartButton 
-          product={product} 
-          selectedSize={selectedSize}
-          quantity={quantity}
+      
+      <View style={styles.bottomBar}>
+        <TouchableOpacity 
+          style={[styles.addToCartButton, !selectedSize && styles.addToCartDisabled]}
           onPress={handleAddToCart}
-        />
+          disabled={!selectedSize}
+        >
+          <Ionicons name="cart-outline" size={16} color={COLORS.white} />
+          <Text style={styles.addToCartText}>
+            SEPETE EKLE • ₺{formatPrice(product.price * quantity)}
+          </Text>
+        </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 };
 
+// ============ STILLER ============
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: COLORS.white,
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.white 
   },
-  loadingContainer: {
-    flex: 1,
+  
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: COLORS.white 
+  },
+  loadingText: { 
+    ...TYPOGRAPHY.caption,
+    marginTop: SIZES.md,
+  },
+  
+  errorContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    backgroundColor: COLORS.white, 
+    padding: SIZES.xl 
+  },
+  errorIconContainer: {
+    width: 80,
+    height: 80,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
+    marginBottom: SIZES.lg,
   },
-  loadingText: {
-    marginTop: 12,
-    fontSize: 16,
-    color: COLORS.ash,
+  errorTitle: { 
+    ...TYPOGRAPHY.caption,
+    marginTop: SIZES.sm, 
+    marginBottom: SIZES.sm 
   },
-  errorContainer: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: COLORS.white,
-    padding: 20,
+  errorText: { 
+    ...TYPOGRAPHY.bodySmall,
+    textAlign: 'center', 
+    marginBottom: SIZES.lg 
   },
-  errorTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: COLORS.charcoal,
-    marginTop: 16,
-    marginBottom: 8,
+  errorButton: { 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight,
+    paddingHorizontal: SIZES.xl, 
+    paddingVertical: SIZES.md 
   },
-  errorText: {
-    fontSize: 14,
-    color: COLORS.ash,
-    textAlign: 'center',
-    marginBottom: 20,
+  errorButtonText: { 
+    ...TYPOGRAPHY.button,
+    color: COLORS.black 
   },
-  errorButton: {
-    backgroundColor: COLORS.cognac,
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    borderRadius: 8,
+  
+  // ✅ HEADER TAMAMEN KALDIRILDI - Bu stil artık kullanılmıyor ama hata vermemesi için bırakıyorum
+  header: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: SIZES.lg, 
+    paddingTop: Platform.OS === 'ios' ? 12 : SIZES.md, 
+    paddingBottom: SIZES.md, 
+    borderBottomWidth: 0.5, 
+    borderBottomColor: COLORS.grayLight 
   },
-  errorButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
+  headerButton: { 
+    padding: SIZES.xs, 
+    position: 'relative' 
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cloud,
-    backgroundColor: COLORS.white,
+  headerRight: { 
+    flexDirection: 'row', 
+    gap: SIZES.md 
   },
-  headerButton: {
-    padding: 8,
-    position: 'relative',
+  cartBadge: { 
+    position: 'absolute', 
+    top: 0, 
+    right: 0, 
+    backgroundColor: COLORS.black, 
+    width: 16, 
+    height: 16, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
   },
-  headerRight: {
-    flexDirection: 'row',
-    gap: 8,
+  cartBadgeText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 8,
+    color: COLORS.white 
   },
-  cartBadge: {
+  
+  scrollContent: { 
+    paddingBottom: 100 
+  },
+  
+  galleryContainer: { 
+    position: 'relative', 
+    height: 380,
+    backgroundColor: COLORS.surface,
+  },
+  galleryImage: { 
+    width: width, 
+    height: 380, 
+    resizeMode: 'cover' 
+  },
+  paginationContainer: {
     position: 'absolute',
-    top: 4,
-    right: 4,
-    backgroundColor: COLORS.cognac,
-    width: 18,
-    height: 18,
-    borderRadius: 9,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  cartBadgeText: {
-    color: COLORS.white,
-    fontSize: 10,
-    fontWeight: 'bold',
-  },
-  scrollContent: {
-    paddingBottom: 100,
-  },
-  quantitySection: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cloud,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.charcoal,
-    marginBottom: 12,
-  },
-  quantityContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 16,
-  },
-  quantityButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.porcelain,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.cloud,
-  },
-  quantityButtonDisabled: {
-    opacity: 0.5,
-  },
-  quantityText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.charcoal,
-    minWidth: 30,
-    textAlign: 'center',
-  },
-  stockText: {
-    fontSize: 14,
-    color: COLORS.success,
-    marginTop: 8,
-  },
-  deliverySection: {
-    paddingHorizontal: 16,
-    paddingVertical: 20,
-    backgroundColor: COLORS.porcelain,
-    marginHorizontal: 16,
-    marginVertical: 16,
-    borderRadius: 12,
-  },
-  deliveryItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-    gap: 12,
-  },
-  deliveryText: {
-    fontSize: 14,
-    color: COLORS.charcoal,
-  },
-  fixedBottom: {
-    position: 'absolute',
-    bottom: 0,
+    bottom: SIZES.md,
     left: 0,
     right: 0,
-    backgroundColor: COLORS.white,
-    borderTopWidth: 1,
-    borderTopColor: COLORS.cloud,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-  },
-  placeholder: {
-    padding: 20,
-    backgroundColor: COLORS.porcelain,
-    margin: 10,
-    borderRadius: 8,
-    alignItems: 'center',
-  },
-  placeholderText: {
-    color: COLORS.ash,
-  },
-  productInfoContainer: {
-    padding: 16,
-  },
-  brand: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: COLORS.cognac,
-    letterSpacing: 1,
-    marginBottom: 4,
-  },
-  productName: {
-    fontSize: 22,
-    fontWeight: '300',
-    color: COLORS.charcoal,
-    marginBottom: 8,
-  },
-  priceRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: 12,
-    marginBottom: 12,
-  },
-  price: {
-    fontSize: 24,
-    fontWeight: '400',
-    color: COLORS.charcoal,
-  },
-  originalPrice: {
-    fontSize: 16,
-    fontWeight: '300',
-    color: COLORS.ash,
-    textDecorationLine: 'line-through',
-  },
-  description: {
-    fontSize: 14,
-    color: COLORS.ash,
-    lineHeight: 20,
-  },
-  sizeContainer: {
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cloud,
-  },
-  sizeList: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  sizeButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: COLORS.porcelain,
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.cloud,
+    gap: SIZES.xs,
   },
-  sizeButtonActive: {
-    backgroundColor: COLORS.cognac,
-    borderColor: COLORS.cognac,
+  paginationDot: {
+    width: 4,
+    height: 4,
+    backgroundColor: COLORS.white,
+    opacity: 0.5,
   },
-  sizeText: {
-    fontSize: 14,
+  paginationDotActive: {
+    width: 16,
+    opacity: 1,
+    backgroundColor: COLORS.black,
+  },
+  favoriteButton: { 
+    position: 'absolute', 
+    top: SIZES.md, 
+    right: SIZES.md, 
+    backgroundColor: COLORS.black, 
+    width: 36, 
+    height: 36, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  
+  productInfoContainer: { 
+    padding: SIZES.lg 
+  },
+  brandContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.sm,
+    marginBottom: SIZES.xs,
+  },
+  brand: { 
+    ...TYPOGRAPHY.caption,
+    letterSpacing: 0.5,
+  },
+  newBadge: {
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    paddingHorizontal: SIZES.xs,
+    paddingVertical: 2,
+  },
+  newBadgeText: {
+    ...TYPOGRAPHY.caption,
+    fontSize: 8,
+    color: COLORS.grayMedium,
+  },
+  productName: { 
+    ...TYPOGRAPHY.title3,
+    marginBottom: SIZES.md 
+  },
+  priceRow: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: SIZES.md, 
+    marginBottom: SIZES.md 
+  },
+  price: { 
+    ...TYPOGRAPHY.title2,
+    fontSize: 24,
+  },
+  originalPrice: { 
+    ...TYPOGRAPHY.body,
+    color: COLORS.grayMedium, 
+    textDecorationLine: 'line-through' 
+  },
+  description: { 
+    ...TYPOGRAPHY.body,
+    lineHeight: 22, 
+    marginBottom: SIZES.md 
+  },
+  ratingContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: SIZES.md, 
+    marginBottom: SIZES.lg 
+  },
+  stars: {
+    flexDirection: 'row',
+    gap: 2,
+  },
+  ratingText: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium 
+  },
+  divider: { 
+    height: 0.5, 
+    backgroundColor: COLORS.grayLight, 
+    marginVertical: SIZES.lg 
+  },
+  detailsRow: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-around' 
+  },
+  detailItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: 4 
+  },
+  detailText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 10,
+    color: COLORS.grayMedium 
+  },
+  
+  sectionContainer: { 
+    paddingHorizontal: SIZES.lg, 
+    paddingVertical: SIZES.md, 
+    borderTopWidth: 0.5, 
+    borderTopColor: COLORS.grayLight 
+  },
+  sectionTitle: { 
+    ...TYPOGRAPHY.caption,
+    marginBottom: SIZES.md 
+  },
+  
+  quantityContainer: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: SIZES.lg 
+  },
+  quantityButton: { 
+    width: 40, 
+    height: 40, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  quantityButtonDisabled: { 
+    opacity: 0.5 
+  },
+  quantityText: { 
+    ...TYPOGRAPHY.body,
     fontWeight: '500',
-    color: COLORS.charcoal,
+    minWidth: 40, 
+    textAlign: 'center' 
   },
-  sizeTextActive: {
-    color: COLORS.white,
+  stockText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium, 
+    marginTop: SIZES.sm 
   },
-  addToCartButton: {
-    backgroundColor: COLORS.cognac,
-    padding: 16,
-    borderRadius: 8,
+  warningText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium, 
+    marginTop: SIZES.sm 
+  },
+  
+  sizeList: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    gap: SIZES.md 
+  },
+  sizeButton: { 
+    width: 44, 
+    height: 44, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  sizeButtonActive: { 
+    backgroundColor: COLORS.black, 
+    borderColor: COLORS.black 
+  },
+  sizeText: { 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500',
+  },
+  sizeTextActive: { 
+    color: COLORS.white 
+  },
+  
+  deliveryContainer: { 
+    margin: SIZES.lg, 
+    padding: SIZES.md, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    gap: SIZES.md 
+  },
+  deliveryItem: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: SIZES.md 
+  },
+  deliveryIcon: {
+    width: 32,
+    height: 32,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    justifyContent: 'center',
     alignItems: 'center',
   },
-  addToCartDisabled: {
-    backgroundColor: COLORS.ash,
+  deliveryTitle: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 11,
   },
-  addToCartText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
+  deliverySubtext: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium, 
+    marginTop: 2 
+  },
+  
+  bottomBar: { 
+    position: 'absolute', 
+    bottom: 0, 
+    left: 0, 
+    right: 0, 
+    backgroundColor: COLORS.white, 
+    borderTopWidth: 0.5, 
+    borderTopColor: COLORS.grayLight, 
+    padding: SIZES.md 
+  },
+  addToCartButton: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'center', 
+    backgroundColor: COLORS.black, 
+    paddingVertical: SIZES.md, 
+    gap: SIZES.sm 
+  },
+  addToCartDisabled: { 
+    backgroundColor: COLORS.grayLight, 
+    opacity: 0.7 
+  },
+  addToCartText: { 
+    ...TYPOGRAPHY.button,
+    color: COLORS.white 
   },
 });
 

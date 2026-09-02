@@ -1,4 +1,4 @@
-// HomeScreen.js - SADECE HATALAR DÜZELTİLDİ
+// 📁 src/screens/HomeScreen.js - LÜKS MİNİMALİST VERSİYON
 import React, { useState, useRef } from 'react';
 import { 
   View, 
@@ -12,11 +12,15 @@ import {
   TextInput,
   ScrollView,
   Dimensions,
-  Animated
+  Animated,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS, TYPOGRAPHY, SIZES } from '../constants/Theme';
 
-// ✅ MOCK DATA (import edilen dosya olmadığı için inline tanımlandı)
+const { width: screenWidth } = Dimensions.get('window');
+
+// MOCK DATA
 const mockData = [
   {
     id: 1,
@@ -60,25 +64,6 @@ const mockData = [
   }
 ];
 
-// 🎨 RENK PALETİ
-const COLORS = {
-  white: '#FFFFFF',
-  ivory: '#F9F6F2',
-  paper: '#F5F3EF',
-  cloud: '#F0F0F0',
-  mist: '#E8E8E8',
-  ash: '#888888',
-  charcoal: '#222222',
-  noir: '#000000',
-  sand: '#D7C1A9',
-  taupe: '#B8A99A',
-  blush: '#E8D4C6',
-  accent: '#8C7853',
-};
-
-const { width: screenWidth } = Dimensions.get('window');
-
-// 🎯 TASARIMCI VERİSİ
 const featuredDesigners = [
   {
     id: '1',
@@ -106,7 +91,6 @@ const featuredDesigners = [
   }
 ];
 
-// 📱 EXPLORE POSTS VERİSİ
 const explorePosts = [
   {
     id: 'post1',
@@ -163,19 +147,26 @@ const HomeScreen = () => {
     );
   };
 
+  const formatNumber = (num) => {
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  };
+
   const TabToggle = () => (
     <View style={styles.toggleContainer}>
       <TouchableOpacity
         style={[styles.toggleButton, activeTab === 'explore' && styles.toggleButtonActive]}
         onPress={() => setActiveTab('explore')}
       >
-        <Text style={[styles.toggleText, activeTab === 'explore' && styles.toggleTextActive]}>Keşfet</Text>
+        <Text style={[styles.toggleText, activeTab === 'explore' && styles.toggleTextActive]}>KEŞFET</Text>
       </TouchableOpacity>
       <TouchableOpacity
         style={[styles.toggleButton, activeTab === 'shop' && styles.toggleButtonActive]}
         onPress={() => setActiveTab('shop')}
       >
-        <Text style={[styles.toggleText, activeTab === 'shop' && styles.toggleTextActive]}>Mağaza</Text>
+        <Text style={[styles.toggleText, activeTab === 'shop' && styles.toggleTextActive]}>MAĞAZA</Text>
       </TouchableOpacity>
     </View>
   );
@@ -183,8 +174,8 @@ const HomeScreen = () => {
   const MenuButton = () => (
     <TouchableOpacity style={styles.menuButton}>
       <View style={styles.menuLine} />
-      <View style={[styles.menuLine, { width: 20 }]} />
-      <View style={[styles.menuLine, { width: 16 }]} />
+      <View style={[styles.menuLine, { width: 18 }]} />
+      <View style={[styles.menuLine, { width: 14 }]} />
     </TouchableOpacity>
   );
 
@@ -208,17 +199,25 @@ const HomeScreen = () => {
   const FeaturedDesigners = () => (
     <View style={styles.designersSection}>
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Seçilen Tasarımcılar</Text>
-        <TouchableOpacity><Text style={styles.seeAllText}>Tümü</Text></TouchableOpacity>
+        <Text style={styles.sectionTitle}>SEÇİLEN TASARIMCILAR</Text>
+        <TouchableOpacity>
+          <Text style={styles.seeAllText}>TÜMÜ</Text>
+        </TouchableOpacity>
       </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.designersScroll}>
+      <ScrollView 
+        horizontal 
+        showsHorizontalScrollIndicator={false} 
+        contentContainerStyle={styles.designersScroll}
+      >
         {featuredDesigners?.map((designer) => (
           <TouchableOpacity key={designer.id} style={styles.designerCard}>
             <Image source={{ uri: designer.avatar }} style={styles.designerAvatar} />
             <View style={styles.designerInfo}>
               <Text style={styles.designerName}>{designer.name}</Text>
               <Text style={styles.designerCategory}>{designer.category}</Text>
-              <View style={styles.followButton}><Text style={styles.followText}>Takip Et</Text></View>
+              <View style={styles.followButton}>
+                <Text style={styles.followText}>TAKİP ET</Text>
+              </View>
             </View>
           </TouchableOpacity>
         ))}
@@ -236,7 +235,9 @@ const HomeScreen = () => {
             <Text style={styles.userName}>{item.userName}</Text>
             <Text style={styles.postTime}>{item.time}</Text>
           </View>
-          <TouchableOpacity><Ionicons name="ellipsis-horizontal" size={20} color={COLORS.ash} /></TouchableOpacity>
+          <TouchableOpacity>
+            <Ionicons name="ellipsis-horizontal" size={18} color={COLORS.grayMedium} />
+          </TouchableOpacity>
         </View>
         <Text style={styles.postContent}>{item.content}</Text>
         {item.product && (
@@ -246,27 +247,45 @@ const HomeScreen = () => {
               <Text style={styles.productDisplayBrand}>{item.product.brand}</Text>
               <Text style={styles.productDisplayName}>{item.product.name}</Text>
               <View style={styles.productFeatures}>
-                <View style={styles.featureTag}><Text style={styles.featureText}>{item.product.material}</Text></View>
-                <View style={styles.featureTag}><Text style={styles.featureText}>{item.product.fit}</Text></View>
+                <View style={styles.featureTag}>
+                  <Text style={styles.featureText}>{item.product.material}</Text>
+                </View>
+                <View style={styles.featureTag}>
+                  <Text style={styles.featureText}>{item.product.fit}</Text>
+                </View>
               </View>
               <View style={styles.combinationSection}>
-                <Text style={styles.combinationTitle}>👗 Kombin Önerisi:</Text>
+                <Text style={styles.combinationTitle}>KOMBİN ÖNERİSİ</Text>
                 <Text style={styles.combinationText}>{item.product.combination}</Text>
               </View>
               <View style={styles.productActions}>
                 <Text style={styles.productPrice}>₺{item.product.price}</Text>
                 <TouchableOpacity onPress={() => toggleFavorite(item.product.id)}>
-                  <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={18} color={isFavorite ? COLORS.accent : COLORS.ash} />
+                  <Ionicons 
+                    name={isFavorite ? "heart" : "heart-outline"} 
+                    size={16} 
+                    color={isFavorite ? COLORS.black : COLORS.grayMedium} 
+                  />
                 </TouchableOpacity>
               </View>
             </View>
           </TouchableOpacity>
         )}
         <View style={styles.postActions}>
-          <TouchableOpacity style={styles.postAction}><Ionicons name="heart-outline" size={20} color={COLORS.ash} /><Text style={styles.actionText}>{item.likes}</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.postAction}><Ionicons name="chatbubble-outline" size={20} color={COLORS.ash} /><Text style={styles.actionText}>{item.comments}</Text></TouchableOpacity>
-          <TouchableOpacity style={styles.postAction}><Ionicons name="share-social-outline" size={20} color={COLORS.ash} /></TouchableOpacity>
-          <TouchableOpacity style={styles.saveButton}><Ionicons name="bookmark-outline" size={20} color={COLORS.ash} /></TouchableOpacity>
+          <TouchableOpacity style={styles.postAction}>
+            <Ionicons name="heart-outline" size={18} color={COLORS.grayMedium} />
+            <Text style={styles.actionText}>{formatNumber(item.likes)}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.postAction}>
+            <Ionicons name="chatbubble-outline" size={18} color={COLORS.grayMedium} />
+            <Text style={styles.actionText}>{formatNumber(item.comments)}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.postAction}>
+            <Ionicons name="share-social-outline" size={18} color={COLORS.grayMedium} />
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.saveButton}>
+            <Ionicons name="bookmark-outline" size={18} color={COLORS.grayMedium} />
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -305,9 +324,17 @@ const HomeScreen = () => {
           <View style={styles.shopImageContainer}>
             <Image source={{ uri: item.image }} style={styles.shopProductImage} />
             <TouchableOpacity style={styles.shopFavoriteButton} onPress={() => toggleFavorite(item.id)}>
-              <Ionicons name={isFavorite ? "heart" : "heart-outline"} size={18} color={isFavorite ? COLORS.accent : COLORS.white} />
+              <Ionicons 
+                name={isFavorite ? "heart" : "heart-outline"} 
+                size={14} 
+                color={isFavorite ? COLORS.black : COLORS.white} 
+              />
             </TouchableOpacity>
-            {item.isNew && <View style={styles.shopNewBadge}><Text style={styles.shopNewBadgeText}>YENİ</Text></View>}
+            {item.isNew && (
+              <View style={styles.shopNewBadge}>
+                <Text style={styles.shopNewBadgeText}>YENİ</Text>
+              </View>
+            )}
           </View>
           <View style={styles.shopProductInfo}>
             <Text style={styles.shopBrandName}>{item.brand}</Text>
@@ -326,13 +353,13 @@ const HomeScreen = () => {
       <FlatList
         data={mockData}
         renderItem={({ item }) => <ProductCard item={item} />}
-        keyExtractor={item => item?.id?.toString() || Math.random().toString()}
+        keyExtractor={item => item?.id?.toString()}
         numColumns={2}
         contentContainerStyle={styles.shopGrid}
         columnWrapperStyle={styles.columnWrapper}
         ListHeaderComponent={
           <View style={styles.shopHeader}>
-            <Text style={styles.shopTitle}>Moda Koleksiyonu</Text>
+            <Text style={styles.shopTitle}>MODA KOLEKSİYONU</Text>
             <Text style={styles.shopSubtitle}>Sezonun en iyi parçaları</Text>
           </View>
         }
@@ -343,102 +370,439 @@ const HomeScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+      
       <View style={styles.header}>
         <MenuButton />
         <View style={styles.logoContainer}>
           <Text style={styles.logo}>VİTRİNİM</Text>
-          <Text style={styles.subtitle}>Modern Moda Evreni</Text>
+          <Text style={styles.subtitle}>MODA EVRENİ</Text>
         </View>
-        <TouchableOpacity onPress={toggleSearch}><Ionicons name="search-outline" size={22} color={COLORS.charcoal} /></TouchableOpacity>
+        <TouchableOpacity onPress={toggleSearch} style={styles.searchIcon}>
+          <Ionicons name="search-outline" size={20} color={COLORS.black} />
+        </TouchableOpacity>
       </View>
+      
       {showSearch && (
-        <Animated.View style={[styles.searchContainer, { opacity: searchAnimation, height: searchAnimation.interpolate({ inputRange: [0, 1], outputRange: [0, 60] }) }]}>
+        <Animated.View style={[
+          styles.searchContainer, 
+          { 
+            opacity: searchAnimation, 
+            height: searchAnimation.interpolate({ 
+              inputRange: [0, 1], 
+              outputRange: [0, 56] 
+            }) 
+          }
+        ]}>
           <View style={styles.searchBar}>
-            <Ionicons name="search-outline" size={18} color={COLORS.ash} />
-            <TextInput style={styles.searchInput} placeholder="Tasarımcı, ürün veya trend ara..." value={searchQuery} onChangeText={setSearchQuery} />
+            <Ionicons name="search-outline" size={16} color={COLORS.grayMedium} />
+            <TextInput 
+              style={styles.searchInput} 
+              placeholder="Tasarımcı, ürün veya trend ara..." 
+              placeholderTextColor={COLORS.grayMedium}
+              value={searchQuery} 
+              onChangeText={setSearchQuery} 
+            />
           </View>
         </Animated.View>
       )}
+      
       <TabToggle />
+      
       {activeTab === 'explore' ? <ExploreFeed /> : <ShopGrid />}
     </SafeAreaView>
   );
 };
 
+// ============ STILLER ============
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.white },
-  header: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 20, paddingTop: 16, paddingBottom: 16 },
-  menuButton: { padding: 8 },
-  menuLine: { width: 24, height: 2, backgroundColor: COLORS.charcoal, marginVertical: 2, borderRadius: 1 },
-  logoContainer: { alignItems: 'center' },
-  logo: { fontSize: 24, fontWeight: '200', letterSpacing: 3, color: COLORS.charcoal },
-  subtitle: { fontSize: 12, fontWeight: '300', color: COLORS.ash, letterSpacing: 1, marginTop: 2 },
-  searchContainer: { paddingHorizontal: 20, overflow: 'hidden' },
-  searchBar: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, paddingHorizontal: 16, paddingVertical: 12, borderRadius: 8, borderWidth: 0.5, borderColor: COLORS.cloud },
-  searchInput: { flex: 1, marginLeft: 12, fontSize: 16, fontWeight: '300', color: COLORS.charcoal },
-  toggleContainer: { flexDirection: 'row', backgroundColor: COLORS.white, marginHorizontal: 20, marginBottom: 20, borderRadius: 8, padding: 4, borderWidth: 0.5, borderColor: COLORS.cloud },
-  toggleButton: { flex: 1, paddingVertical: 12, alignItems: 'center', borderRadius: 6 },
-  toggleButtonActive: { backgroundColor: COLORS.charcoal },
-  toggleText: { fontSize: 15, fontWeight: '300', color: COLORS.ash, letterSpacing: 1 },
-  toggleTextActive: { color: COLORS.white, fontWeight: '400' },
-  designersSection: { paddingHorizontal: 20, marginBottom: 24 },
-  designersScroll: { paddingRight: 20 },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '300', color: COLORS.charcoal, letterSpacing: 1 },
-  seeAllText: { fontSize: 14, fontWeight: '300', color: COLORS.ash },
-  designerCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, padding: 16, borderRadius: 12, marginRight: 12, width: screenWidth * 0.7, borderWidth: 0.5, borderColor: COLORS.cloud },
-  designerAvatar: { width: 60, height: 60, borderRadius: 30, marginRight: 16 },
-  designerInfo: { flex: 1 },
-  designerName: { fontSize: 16, fontWeight: '300', color: COLORS.charcoal, marginBottom: 4 },
-  designerCategory: { fontSize: 13, fontWeight: '300', color: COLORS.ash, marginBottom: 12 },
-  followButton: { alignSelf: 'flex-start', paddingHorizontal: 16, paddingVertical: 6, backgroundColor: COLORS.charcoal, borderRadius: 15 },
-  followText: { fontSize: 12, fontWeight: '400', color: COLORS.white },
-  storiesSection: { paddingHorizontal: 20, marginBottom: 24 },
-  storyCircle: { alignItems: 'center', marginRight: 16 },
-  storyImage: { width: 64, height: 64, borderRadius: 32, marginBottom: 8 },
-  storyName: { fontSize: 12, fontWeight: '300', color: COLORS.charcoal },
-  feedContent: { paddingBottom: 24 },
-  postCard: { backgroundColor: COLORS.white, marginBottom: 24, paddingHorizontal: 20 },
-  postHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: 16 },
-  userAvatar: { width: 40, height: 40, borderRadius: 20, marginRight: 12 },
-  userInfo: { flex: 1 },
-  userName: { fontSize: 15, fontWeight: '400', color: COLORS.charcoal, marginBottom: 2 },
-  postTime: { fontSize: 12, fontWeight: '300', color: COLORS.ash },
-  postContent: { fontSize: 15, fontWeight: '300', color: COLORS.charcoal, lineHeight: 22, marginBottom: 16 },
-  productDisplay: { flexDirection: 'row', backgroundColor: COLORS.ivory, borderRadius: 12, overflow: 'hidden', marginBottom: 16 },
-  productDisplayImage: { width: 100, height: 140 },
-  productDisplayInfo: { flex: 1, padding: 16 },
-  productDisplayBrand: { fontSize: 11, fontWeight: '400', color: COLORS.ash, textTransform: 'uppercase', marginBottom: 4 },
-  productDisplayName: { fontSize: 15, fontWeight: '300', color: COLORS.charcoal, marginBottom: 12 },
-  productFeatures: { flexDirection: 'row', marginBottom: 12 },
-  featureTag: { paddingHorizontal: 10, paddingVertical: 4, backgroundColor: COLORS.white, borderRadius: 12, marginRight: 8, borderWidth: 0.5, borderColor: COLORS.cloud },
-  featureText: { fontSize: 11, fontWeight: '300', color: COLORS.ash },
-  combinationSection: { marginBottom: 12 },
-  combinationTitle: { fontSize: 13, fontWeight: '400', color: COLORS.charcoal, marginBottom: 4 },
-  combinationText: { fontSize: 13, fontWeight: '300', color: COLORS.ash },
-  productActions: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
-  productPrice: { fontSize: 16, fontWeight: '400', color: COLORS.charcoal },
-  postActions: { flexDirection: 'row', alignItems: 'center', paddingVertical: 12, borderTopWidth: 0.5, borderTopColor: COLORS.cloud },
-  postAction: { flexDirection: 'row', alignItems: 'center', marginRight: 20 },
-  actionText: { fontSize: 14, fontWeight: '300', color: COLORS.ash, marginLeft: 6 },
-  saveButton: { marginLeft: 'auto' },
-  shopHeader: { paddingHorizontal: 8, paddingTop: 8, paddingBottom: 24, alignItems: 'center' },
-  shopTitle: { fontSize: 24, fontWeight: '200', color: COLORS.charcoal, letterSpacing: 2, marginBottom: 8 },
-  shopSubtitle: { fontSize: 14, fontWeight: '300', color: COLORS.ash },
-  shopGrid: { paddingHorizontal: 16, paddingBottom: 24 },
-  columnWrapper: { justifyContent: 'space-between', marginBottom: 16 },
-  shopProductCard: { flex: 1, maxWidth: '48%', backgroundColor: COLORS.white },
-  shopImageContainer: { position: 'relative', marginBottom: 12 },
-  shopProductImage: { width: '100%', height: 200, borderRadius: 8 },
-  shopFavoriteButton: { position: 'absolute', top: 12, right: 12, backgroundColor: 'rgba(0,0,0,0.2)', borderRadius: 15, padding: 6 },
-  shopNewBadge: { position: 'absolute', bottom: 12, left: 12, backgroundColor: COLORS.accent, paddingHorizontal: 10, paddingVertical: 4, borderRadius: 4 },
-  shopNewBadgeText: { fontSize: 10, fontWeight: '500', color: COLORS.white },
-  shopProductInfo: { paddingHorizontal: 4 },
-  shopBrandName: { fontSize: 11, fontWeight: '400', color: COLORS.ash, textTransform: 'uppercase', marginBottom: 4 },
-  shopProductName: { fontSize: 14, fontWeight: '300', color: COLORS.charcoal, marginBottom: 8 },
-  shopFeatures: { flexDirection: 'row', marginBottom: 8 },
-  shopFeatureText: { fontSize: 12, fontWeight: '300', color: COLORS.ash, marginRight: 8 },
-  shopProductPrice: { fontSize: 15, fontWeight: '400', color: COLORS.charcoal },
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.white 
+  },
+  
+  // Header
+  header: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    justifyContent: 'space-between', 
+    paddingHorizontal: SIZES.lg, 
+    paddingTop: Platform.OS === 'ios' ? 12 : SIZES.md, 
+    paddingBottom: SIZES.md 
+  },
+  menuButton: { 
+    padding: SIZES.xs,
+    width: 40,
+  },
+  menuLine: { 
+    width: 20, 
+    height: 1, 
+    backgroundColor: COLORS.black, 
+    marginVertical: 3 
+  },
+  logoContainer: { 
+    alignItems: 'center' 
+  },
+  logo: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 16,
+    letterSpacing: 3, 
+  },
+  subtitle: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 8,
+    color: COLORS.grayMedium, 
+    letterSpacing: 1, 
+    marginTop: 2 
+  },
+  searchIcon: {
+    padding: SIZES.xs,
+    width: 40,
+    alignItems: 'flex-end',
+  },
+  
+  // Search
+  searchContainer: { 
+    paddingHorizontal: SIZES.lg, 
+    overflow: 'hidden' 
+  },
+  searchBar: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: COLORS.white, 
+    paddingHorizontal: SIZES.md, 
+    paddingVertical: SIZES.sm, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight 
+  },
+  searchInput: { 
+    flex: 1, 
+    marginLeft: SIZES.md, 
+    ...TYPOGRAPHY.body,
+    color: COLORS.black 
+  },
+  
+  // Toggle
+  toggleContainer: { 
+    flexDirection: 'row', 
+    marginHorizontal: SIZES.lg, 
+    marginBottom: SIZES.lg, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight 
+  },
+  toggleButton: { 
+    flex: 1, 
+    paddingVertical: SIZES.sm, 
+    alignItems: 'center' 
+  },
+  toggleButtonActive: { 
+    backgroundColor: COLORS.black 
+  },
+  toggleText: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium 
+  },
+  toggleTextActive: { 
+    color: COLORS.white 
+  },
+  
+  // Designers Section
+  designersSection: { 
+    paddingHorizontal: SIZES.lg, 
+    marginBottom: SIZES.lg 
+  },
+  designersScroll: { 
+    paddingRight: SIZES.lg 
+  },
+  sectionHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: SIZES.md 
+  },
+  sectionTitle: { 
+    ...TYPOGRAPHY.caption,
+  },
+  seeAllText: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium 
+  },
+  designerCard: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: COLORS.white, 
+    padding: SIZES.md, 
+    marginRight: SIZES.md, 
+    width: screenWidth * 0.65, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight 
+  },
+  designerAvatar: { 
+    width: 50, 
+    height: 50, 
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    marginRight: SIZES.md 
+  },
+  designerInfo: { 
+    flex: 1 
+  },
+  designerName: { 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500', 
+    marginBottom: 2 
+  },
+  designerCategory: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium, 
+    marginBottom: SIZES.sm 
+  },
+  followButton: { 
+    alignSelf: 'flex-start', 
+    paddingHorizontal: SIZES.md, 
+    paddingVertical: 2, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.black 
+  },
+  followText: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.black,
+    fontSize: 9,
+  },
+  
+  // Stories
+  storiesSection: { 
+    paddingHorizontal: SIZES.lg, 
+    marginBottom: SIZES.lg 
+  },
+  storyCircle: { 
+    alignItems: 'center', 
+    marginRight: SIZES.md 
+  },
+  storyImage: { 
+    width: 56, 
+    height: 56, 
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    marginBottom: SIZES.xs,
+    backgroundColor: COLORS.surface,
+  },
+  storyName: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium 
+  },
+  
+  feedContent: { 
+    paddingBottom: SIZES.xl 
+  },
+  
+  // Post Card
+  postCard: { 
+    backgroundColor: COLORS.white, 
+    marginBottom: SIZES.lg, 
+    paddingHorizontal: SIZES.lg 
+  },
+  postHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: SIZES.md 
+  },
+  userAvatar: { 
+    width: 40, 
+    height: 40, 
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    marginRight: SIZES.md 
+  },
+  userInfo: { 
+    flex: 1 
+  },
+  userName: { 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500', 
+    marginBottom: 2 
+  },
+  postTime: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium 
+  },
+  postContent: { 
+    ...TYPOGRAPHY.body,
+    lineHeight: 20, 
+    marginBottom: SIZES.md 
+  },
+  
+  // Product Display
+  productDisplay: { 
+    flexDirection: 'row', 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    marginBottom: SIZES.md 
+  },
+  productDisplayImage: { 
+    width: 90, 
+    height: 120, 
+    backgroundColor: COLORS.surface 
+  },
+  productDisplayInfo: { 
+    flex: 1, 
+    padding: SIZES.md 
+  },
+  productDisplayBrand: { 
+    ...TYPOGRAPHY.caption,
+    marginBottom: 2 
+  },
+  productDisplayName: { 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500', 
+    marginBottom: SIZES.sm 
+  },
+  productFeatures: { 
+    flexDirection: 'row', 
+    marginBottom: SIZES.sm 
+  },
+  featureTag: { 
+    paddingHorizontal: SIZES.sm, 
+    paddingVertical: 2, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    marginRight: SIZES.xs 
+  },
+  featureText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium 
+  },
+  combinationSection: { 
+    marginBottom: SIZES.sm 
+  },
+  combinationTitle: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    marginBottom: 2 
+  },
+  combinationText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium 
+  },
+  productActions: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center' 
+  },
+  productPrice: { 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500', 
+  },
+  
+  // Post Actions
+  postActions: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    paddingVertical: SIZES.md, 
+    borderTopWidth: 0.5, 
+    borderTopColor: COLORS.grayLight 
+  },
+  postAction: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginRight: SIZES.lg 
+  },
+  actionText: { 
+    ...TYPOGRAPHY.caption,
+    marginLeft: 4 
+  },
+  saveButton: { 
+    marginLeft: 'auto' 
+  },
+  
+  // Shop Grid
+  shopHeader: { 
+    paddingHorizontal: SIZES.sm, 
+    paddingTop: SIZES.sm, 
+    paddingBottom: SIZES.lg, 
+    alignItems: 'center' 
+  },
+  shopTitle: { 
+    ...TYPOGRAPHY.title3,
+    fontSize: 18,
+    marginBottom: 4 
+  },
+  shopSubtitle: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium 
+  },
+  shopGrid: { 
+    paddingHorizontal: SIZES.md, 
+    paddingBottom: SIZES.xl 
+  },
+  columnWrapper: { 
+    justifyContent: 'space-between', 
+    marginBottom: SIZES.md 
+  },
+  shopProductCard: { 
+    flex: 1, 
+    maxWidth: '48%' 
+  },
+  shopImageContainer: { 
+    position: 'relative', 
+    marginBottom: SIZES.md 
+  },
+  shopProductImage: { 
+    width: '100%', 
+    height: 200, 
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    backgroundColor: COLORS.surface 
+  },
+  shopFavoriteButton: { 
+    position: 'absolute', 
+    top: SIZES.sm, 
+    right: SIZES.sm, 
+    backgroundColor: COLORS.black, 
+    padding: 4 
+  },
+  shopNewBadge: { 
+    position: 'absolute', 
+    bottom: SIZES.sm, 
+    left: SIZES.sm, 
+    borderWidth: 0.5, 
+    borderColor: COLORS.black,
+    paddingHorizontal: SIZES.sm, 
+    paddingVertical: 2 
+  },
+  shopNewBadgeText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 8,
+    color: COLORS.black 
+  },
+  shopProductInfo: { 
+    paddingHorizontal: 2 
+  },
+  shopBrandName: { 
+    ...TYPOGRAPHY.caption,
+    marginBottom: 2 
+  },
+  shopProductName: { 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500', 
+    marginBottom: 4 
+  },
+  shopFeatures: { 
+    flexDirection: 'row', 
+    marginBottom: 4 
+  },
+  shopFeatureText: { 
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium, 
+    marginRight: 4 
+  },
+  shopProductPrice: { 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500', 
+  },
 });
 
 export default HomeScreen;

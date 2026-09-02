@@ -1,3 +1,4 @@
+// 📁 src/screens/StyleDetailScreen.js - LÜKS MİNİMALİST VERSİYON
 import React, { useState } from 'react';
 import { 
   View, 
@@ -9,36 +10,18 @@ import {
   SafeAreaView,
   StatusBar,
   Alert,
-  Dimensions
+  Dimensions,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { COLORS, TYPOGRAPHY, SIZES } from '../constants/Theme';
 
 const { width } = Dimensions.get('window');
-
-// 🎨 Renk paleti (App.js ile uyumlu - cognac düzeltildi)
-const COLORS = {
-  white: '#FFFFFF',
-  ivory: '#F9F6F2',
-  paper: '#F5F3EF',
-  cloud: '#F0F0F0',
-  mist: '#E8E8E8',
-  ash: '#888888',
-  charcoal: '#222222',
-  noir: '#000000',
-  cognac: '#8C7853',  // ✅ DÜZELTİLDİ
-  porcelain: '#FAFAFA',
-  accent: '#8C7853',
-  success: '#4CAF50',
-  warning: '#FF9800',
-  error: '#F44336',
-  like: '#E91E63',
-};
 
 const StyleDetailScreen = ({ route, navigation }) => {
   const styleId = route?.params?.styleId || 'evening';
   const [activeSubTab, setActiveSubTab] = useState(0);
 
-  // ✅ TÜM KONSEPTLER İÇİN ALT SEKMELER
   const styleData = {
     evening: {
       id: 'evening',
@@ -48,24 +31,24 @@ const StyleDetailScreen = ({ route, navigation }) => {
       subTabs: ['KOKTEYL', 'DÜĞÜN', 'GALA', 'ROMANTİK AKŞAM'],
       combinations: {
         'KOKTEYL': [
-          { id: 1, name: 'Siyah Elbise & Kristal Aksesuar', likes: 124, image: 'https://images.unsplash.com/photo-1569317002804-ab77bcf1bce4?w=400' },
-          { id: 2, name: 'Kırmızı Abiye & Altın Kemer', likes: 98, image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=400' },
-          { id: 3, name: 'Saten Bluz & Siyah Pantolon', likes: 76, image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400' }
+          { id: 1, name: 'Siyah Elbise & Kristal Aksesuar', likes: 124 },
+          { id: 2, name: 'Kırmızı Abiye & Altın Kemer', likes: 98 },
+          { id: 3, name: 'Saten Bluz & Siyah Pantolon', likes: 76 }
         ],
         'DÜĞÜN': [
-          { id: 4, name: 'Pastel Elbise & İnce Topuk', likes: 156, image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400' },
-          { id: 5, name: 'Dantel Süs & İnci Kolye', likes: 112, image: 'https://images.unsplash.com/photo-1523380744952-b7e00e6e2ffa?w=400' },
-          { id: 6, name: 'Uzun Etek & Nakış Bluz', likes: 89, image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400' }
+          { id: 4, name: 'Pastel Elbise & İnce Topuk', likes: 156 },
+          { id: 5, name: 'Dantel Süs & İnci Kolye', likes: 112 },
+          { id: 6, name: 'Uzun Etek & Nakış Bluz', likes: 89 }
         ],
         'GALA': [
-          { id: 7, name: 'Gece Elbisesi & Pırlanta Set', likes: 203, image: 'https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?w=400' },
-          { id: 8, name: 'Kürk Yelek & İpek Elbise', likes: 167, image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400' },
-          { id: 9, name: 'Brode Kumaş & Kristal Topuk', likes: 134, image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400' }
+          { id: 7, name: 'Gece Elbisesi & Pırlanta Set', likes: 203 },
+          { id: 8, name: 'Kürk Yelek & İpek Elbise', likes: 167 },
+          { id: 9, name: 'Brode Kumaş & Kristal Topuk', likes: 134 }
         ],
         'ROMANTİK AKŞAM': [
-          { id: 10, name: 'Kırmızı Elbise & Kırmızı Ruj', likes: 145, image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400' },
-          { id: 11, name: 'Saten Gömlek & Deri Pantolon', likes: 98, image: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=400' },
-          { id: 12, name: 'İşlemeli Bluz & Midi Etek', likes: 76, image: 'https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400' }
+          { id: 10, name: 'Kırmızı Elbise & Kırmızı Ruj', likes: 145 },
+          { id: 11, name: 'Saten Gömlek & Deri Pantolon', likes: 98 },
+          { id: 12, name: 'İşlemeli Bluz & Midi Etek', likes: 76 }
         ]
       }
     },
@@ -77,24 +60,24 @@ const StyleDetailScreen = ({ route, navigation }) => {
       subTabs: ['SPOR CASUAL', 'STREET STYLE', 'MİNİMAL', 'BOHEM'],
       combinations: {
         'SPOR CASUAL': [
-          { id: 13, name: 'Oversize T-shirt & Kot Şort', likes: 234, image: 'https://images.unsplash.com/photo-1554568218-0f1715e72254?w=400' },
-          { id: 14, name: 'Sweatshirt & Jogger Pantolon', likes: 187, image: 'https://images.unsplash.com/photo-1580657018955-f7aa5b3b3f0f?w=400' },
-          { id: 15, name: 'Basketbol Atlet & Eşofman', likes: 156, image: 'https://images.unsplash.com/photo-1556906781-9a412961b5c8?w=400' }
+          { id: 13, name: 'Oversize T-shirt & Kot Şort', likes: 234 },
+          { id: 14, name: 'Sweatshirt & Jogger Pantolon', likes: 187 },
+          { id: 15, name: 'Basketbol Atlet & Eşofman', likes: 156 }
         ],
         'STREET STYLE': [
-          { id: 16, name: 'Bomber Ceket & Ripped Kot', likes: 198, image: 'https://images.unsplash.com/photo-1544441893-675973e31985?w=400' },
-          { id: 17, name: 'Oversize Hoodie & Basket Ayakkabı', likes: 176, image: 'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=400' },
-          { id: 18, name: 'Graphic T-shirt & Sneaker', likes: 154, image: 'https://images.unsplash.com/photo-1554568218-0f1715e72254?w=400' }
+          { id: 16, name: 'Bomber Ceket & Ripped Kot', likes: 198 },
+          { id: 17, name: 'Oversize Hoodie & Basket Ayakkabı', likes: 176 },
+          { id: 18, name: 'Graphic T-shirt & Sneaker', likes: 154 }
         ],
         'MİNİMAL': [
-          { id: 19, name: 'Beyaz Gömlek & Siyah Kot', likes: 167, image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400' },
-          { id: 20, name: 'Nötr Tonlar & Deri Ayakkabı', likes: 143, image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400' },
-          { id: 21, name: 'Basic T-shirt & Chino Pantolon', likes: 128, image: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=400' }
+          { id: 19, name: 'Beyaz Gömlek & Siyah Kot', likes: 167 },
+          { id: 20, name: 'Nötr Tonlar & Deri Ayakkabı', likes: 143 },
+          { id: 21, name: 'Basic T-shirt & Chino Pantolon', likes: 128 }
         ],
         'BOHEM': [
-          { id: 22, name: 'İşlemeli Bluz & Maksı Etek', likes: 145, image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400' },
-          { id: 23, name: 'Fular & Bol Pantolon', likes: 112, image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400' },
-          { id: 24, name: 'Nakış Detay & Doğal Aksesuar', likes: 98, image: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400' }
+          { id: 22, name: 'İşlemeli Bluz & Maksı Etek', likes: 145 },
+          { id: 23, name: 'Fular & Bol Pantolon', likes: 112 },
+          { id: 24, name: 'Nakış Detay & Doğal Aksesuar', likes: 98 }
         ]
       }
     },
@@ -106,29 +89,29 @@ const StyleDetailScreen = ({ route, navigation }) => {
       subTabs: ['TOPLANTI', 'NORMAL GÜN', 'ÖZEL GÜN', 'DOĞUM GÜNÜ', 'TERFİ'],
       combinations: {
         'TOPLANTI': [
-          { id: 25, name: 'Klasik Takım Elbise & Gömlek', likes: 189, image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400' },
-          { id: 26, name: 'Blazer & Siyah Pantolon', likes: 156, image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400' },
-          { id: 27, name: 'İpek Bluz & Pencil Etek', likes: 134, image: 'https://images.unsplash.com/photo-1569317002804-ab77bcf1bce4?w=400' }
+          { id: 25, name: 'Klasik Takım Elbise & Gömlek', likes: 189 },
+          { id: 26, name: 'Blazer & Siyah Pantolon', likes: 156 },
+          { id: 27, name: 'İpek Bluz & Pencil Etek', likes: 134 }
         ],
         'NORMAL GÜN': [
-          { id: 28, name: 'Gömlek & Chino Pantolon', likes: 167, image: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=400' },
-          { id: 29, name: 'Kazak & Kot Pantolon', likes: 145, image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400' },
-          { id: 30, name: 'Tunik & Düz Etek', likes: 123, image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400' }
+          { id: 28, name: 'Gömlek & Chino Pantolon', likes: 167 },
+          { id: 29, name: 'Kazak & Kot Pantolon', likes: 145 },
+          { id: 30, name: 'Tunik & Düz Etek', likes: 123 }
         ],
         'ÖZEL GÜN': [
-          { id: 31, name: 'İpek Elbise & İnce Topuk', likes: 178, image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=400' },
-          { id: 32, name: 'Saten Bluz & Sade Takı', likes: 154, image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400' },
-          { id: 33, name: 'Kırmızı Gömlek & Siyah Pantolon', likes: 132, image: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=400' }
+          { id: 31, name: 'İpek Elbise & İnce Topuk', likes: 178 },
+          { id: 32, name: 'Saten Bluz & Sade Takı', likes: 154 },
+          { id: 33, name: 'Kırmızı Gömlek & Siyah Pantolon', likes: 132 }
         ],
         'DOĞUM GÜNÜ': [
-          { id: 34, name: 'Renkli Bluz & Siyah Pantolon', likes: 145, image: 'https://images.unsplash.com/photo-1523380744952-b7e00e6e2ffa?w=400' },
-          { id: 35, name: 'Desenli Elbise & Topuklu', likes: 128, image: 'https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?w=400' },
-          { id: 36, name: 'Sequins Top & Denim Pantolon', likes: 112, image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=400' }
+          { id: 34, name: 'Renkli Bluz & Siyah Pantolon', likes: 145 },
+          { id: 35, name: 'Desenli Elbise & Topuklu', likes: 128 },
+          { id: 36, name: 'Sequins Top & Denim Pantolon', likes: 112 }
         ],
         'TERFİ': [
-          { id: 37, name: 'Koyu Takım Elbise & Kırmızı Gömlek', likes: 167, image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400' },
-          { id: 38, name: 'Siyah Elbise & İnci Kolye', likes: 145, image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=400' },
-          { id: 39, name: 'Blazer & İpek Bluz', likes: 134, image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400' }
+          { id: 37, name: 'Koyu Takım Elbise & Kırmızı Gömlek', likes: 167 },
+          { id: 38, name: 'Siyah Elbise & İnci Kolye', likes: 145 },
+          { id: 39, name: 'Blazer & İpek Bluz', likes: 134 }
         ]
       }
     },
@@ -140,24 +123,24 @@ const StyleDetailScreen = ({ route, navigation }) => {
       subTabs: ['FITNESS', 'YOGA', 'KOŞU', 'OUTDOOR'],
       combinations: {
         'FITNESS': [
-          { id: 40, name: 'Tank Top & Legging', likes: 198, image: 'https://images.unsplash.com/photo-1556906781-9a412961b5c8?w=400' },
-          { id: 41, name: 'Spor Atlet & Şort', likes: 176, image: 'https://images.unsplash.com/photo-1580657018955-f7aa5b3b3f0f?w=400' },
-          { id: 42, name: 'Croptop & Eşofman', likes: 154, image: 'https://images.unsplash.com/photo-1554568218-0f1715e72254?w=400' }
+          { id: 40, name: 'Tank Top & Legging', likes: 198 },
+          { id: 41, name: 'Spor Atlet & Şort', likes: 176 },
+          { id: 42, name: 'Croptop & Eşofman', likes: 154 }
         ],
         'YOGA': [
-          { id: 43, name: 'Yoga Pantolon & Sports Bra', likes: 167, image: 'https://images.unsplash.com/photo-1556906781-9a412961b5c8?w=400' },
-          { id: 44, name: 'Legging & Oversize T-shirt', likes: 145, image: 'https://images.unsplash.com/photo-1580657018955-f7aa5b3b3f0f?w=400' },
-          { id: 45, name: 'Yoga Set & Mat', likes: 128, image: 'https://images.unsplash.com/photo-1554568218-0f1715e72254?w=400' }
+          { id: 43, name: 'Yoga Pantolon & Sports Bra', likes: 167 },
+          { id: 44, name: 'Legging & Oversize T-shirt', likes: 145 },
+          { id: 45, name: 'Yoga Set & Mat', likes: 128 }
         ],
         'KOŞU': [
-          { id: 46, name: 'Running Atlet & Şort', likes: 156, image: 'https://images.unsplash.com/photo-1556906781-9a412961b5c8?w=400' },
-          { id: 47, name: 'Rüzgarlık & Tights', likes: 134, image: 'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=400' },
-          { id: 48, name: 'Koşu Ayakkabısı & Şapka', likes: 112, image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400' }
+          { id: 46, name: 'Running Atlet & Şort', likes: 156 },
+          { id: 47, name: 'Rüzgarlık & Tights', likes: 134 },
+          { id: 48, name: 'Koşu Ayakkabısı & Şapka', likes: 112 }
         ],
         'OUTDOOR': [
-          { id: 49, name: 'Hiking Pantolon & Polar', likes: 145, image: 'https://images.unsplash.com/photo-1556906781-9a412961b5c8?w=400' },
-          { id: 50, name: 'Windbreaker & Trekking Ayakkabı', likes: 123, image: 'https://images.unsplash.com/photo-1552374196-1ab2a1c593e8?w=400' },
-          { id: 51, name: 'Fleece & Outdoor Şapka', likes: 98, image: 'https://images.unsplash.com/photo-1554568218-0f1715e72254?w=400' }
+          { id: 49, name: 'Hiking Pantolon & Polar', likes: 145 },
+          { id: 50, name: 'Windbreaker & Trekking Ayakkabı', likes: 123 },
+          { id: 51, name: 'Fleece & Outdoor Şapka', likes: 98 }
         ]
       }
     },
@@ -169,24 +152,24 @@ const StyleDetailScreen = ({ route, navigation }) => {
       subTabs: ['NİŞAN', 'MEZUNİYET', 'DOĞUM GÜNÜ', 'YILBAŞI'],
       combinations: {
         'NİŞAN': [
-          { id: 52, name: 'Beyaz Elbise & İnce Topuk', likes: 223, image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=400' },
-          { id: 53, name: 'Saten Bluz & Siyah Pantolon', likes: 187, image: 'https://images.unsplash.com/photo-1569317002804-ab77bcf1bce4?w=400' },
-          { id: 54, name: 'Dantel Dress & İnci Set', likes: 165, image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400' }
+          { id: 52, name: 'Beyaz Elbise & İnce Topuk', likes: 223 },
+          { id: 53, name: 'Saten Bluz & Siyah Pantolon', likes: 187 },
+          { id: 54, name: 'Dantel Dress & İnci Set', likes: 165 }
         ],
         'MEZUNİYET': [
-          { id: 55, name: 'Cübbe Altı Elbise & Topuklu', likes: 198, image: 'https://images.unsplash.com/photo-1523380744952-b7e00e6e2ffa?w=400' },
-          { id: 56, name: 'Blazer & Midi Etek', likes: 167, image: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400' },
-          { id: 57, name: 'Gömlek & Pantolon Kombini', likes: 145, image: 'https://images.unsplash.com/photo-1441984904996-e0b6ba687e04?w=400' }
+          { id: 55, name: 'Cübbe Altı Elbise & Topuklu', likes: 198 },
+          { id: 56, name: 'Blazer & Midi Etek', likes: 167 },
+          { id: 57, name: 'Gömlek & Pantolon Kombini', likes: 145 }
         ],
         'DOĞUM GÜNÜ': [
-          { id: 58, name: 'Sequins Elbise & Topuklu', likes: 176, image: 'https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?w=400' },
-          { id: 59, name: 'Renkli Bluz & Denim', likes: 154, image: 'https://images.unsplash.com/photo-1523380744952-b7e00e6e2ffa?w=400' },
-          { id: 60, name: 'Parti Kıyafeti & Aksesuar', likes: 132, image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=400' }
+          { id: 58, name: 'Sequins Elbise & Topuklu', likes: 176 },
+          { id: 59, name: 'Renkli Bluz & Denim', likes: 154 },
+          { id: 60, name: 'Parti Kıyafeti & Aksesuar', likes: 132 }
         ],
         'YILBAŞI': [
-          { id: 61, name: 'Kırmızı Elbise & Kristal', likes: 189, image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=400' },
-          { id: 62, name: 'Saten Bluz & Siyah Pantolon', likes: 167, image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=400' },
-          { id: 63, name: 'Gece Kıyafeti & Topuklu', likes: 145, image: 'https://images.unsplash.com/photo-1434389677669-e08b4cac3105?w=400' }
+          { id: 61, name: 'Kırmızı Elbise & Kristal', likes: 189 },
+          { id: 62, name: 'Saten Bluz & Siyah Pantolon', likes: 167 },
+          { id: 63, name: 'Gece Kıyafeti & Topuklu', likes: 145 }
         ]
       }
     }
@@ -195,6 +178,13 @@ const StyleDetailScreen = ({ route, navigation }) => {
   const currentStyle = styleData[styleId] || styleData.evening;
   const activeSubTabName = currentStyle.subTabs[activeSubTab] || currentStyle.subTabs[0];
   const currentCombinations = currentStyle.combinations[activeSubTabName] || [];
+
+  const formatNumber = (num) => {
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  };
 
   const handleGoBack = () => {
     if (navigation && navigation.goBack) {
@@ -207,7 +197,7 @@ const StyleDetailScreen = ({ route, navigation }) => {
   const handleViewCombination = (item) => {
     Alert.alert(
       item.name,
-      `Bu kombin ${item.likes} kişi tarafından beğenildi.`,
+      `Bu kombin ${formatNumber(item.likes)} kişi tarafından beğenildi.`,
       [
         {
           text: 'Detayları Gör',
@@ -231,8 +221,8 @@ const StyleDetailScreen = ({ route, navigation }) => {
       <View style={styles.combinationContent}>
         <Text style={styles.combinationName}>{item.name}</Text>
         <View style={styles.likeContainer}>
-          <Ionicons name="heart" size={16} color={COLORS.like} />
-          <Text style={styles.likeCount}>{item.likes}</Text>
+          <Ionicons name="heart" size={10} color={COLORS.grayMedium} />
+          <Text style={styles.likeCount}>{formatNumber(item.likes)}</Text>
         </View>
       </View>
       <TouchableOpacity 
@@ -254,12 +244,12 @@ const StyleDetailScreen = ({ route, navigation }) => {
           onPress={handleGoBack}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="arrow-back" size={24} color={COLORS.charcoal} />
+          <Ionicons name="arrow-back" size={22} color={COLORS.black} />
         </TouchableOpacity>
         <Text style={styles.title}>{currentStyle.title}</Text>
         <View style={styles.headerRight}>
           <TouchableOpacity style={styles.favoriteButton}>
-            <Ionicons name="heart-outline" size={24} color={COLORS.charcoal} />
+            <Ionicons name="heart-outline" size={18} color={COLORS.black} />
           </TouchableOpacity>
         </View>
       </View>
@@ -270,7 +260,7 @@ const StyleDetailScreen = ({ route, navigation }) => {
       >
         <View style={styles.iconContainer}>
           <View style={styles.iconCircle}>
-            <Ionicons name={currentStyle.icon || 'flower-outline'} size={32} color={COLORS.cognac} />
+            <Ionicons name={currentStyle.icon || 'flower-outline'} size={22} color={COLORS.black} />
           </View>
           <Text style={styles.styleTitle}>{currentStyle.title}</Text>
           <Text style={styles.description}>{currentStyle.description}</Text>
@@ -311,7 +301,7 @@ const StyleDetailScreen = ({ route, navigation }) => {
               {activeSubTabName} KOMBİNLERİ
             </Text>
             <Text style={styles.sectionCount}>
-              {currentCombinations.length} kombin
+              {currentCombinations.length} KOMBİN
             </Text>
           </View>
           
@@ -324,14 +314,14 @@ const StyleDetailScreen = ({ route, navigation }) => {
             />
           ) : (
             <View style={styles.emptyContainer}>
-              <Ionicons name="images-outline" size={48} color={COLORS.ash} />
-              <Text style={styles.emptyText}>Bu kategoride kombin bulunamadı</Text>
+              <Ionicons name="images-outline" size={32} color={COLORS.grayMedium} />
+              <Text style={styles.emptyText}>BU KATEGORİDE KOMBİN BULUNAMADI</Text>
             </View>
           )}
         </View>
 
         <View style={styles.aiSuggestion}>
-          <Ionicons name="sparkles" size={20} color={COLORS.cognac} />
+          <Ionicons name="sparkles" size={14} color={COLORS.black} />
           <Text style={styles.aiText}>
             AI size {activeSubTabName.toLowerCase()} için özel kombinler öneriyor
           </Text>
@@ -341,195 +331,186 @@ const StyleDetailScreen = ({ route, navigation }) => {
   );
 };
 
+// ============ STILLER ============
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.white,
   },
   scrollContent: {
-    paddingBottom: 30,
+    paddingBottom: SIZES.xl,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: COLORS.cloud,
+    paddingHorizontal: SIZES.lg,
+    paddingTop: Platform.OS === 'ios' ? 12 : SIZES.md,
+    paddingBottom: SIZES.md,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.grayLight,
   },
   backButton: {
-    padding: 4,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
   },
   title: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.charcoal,
+    ...TYPOGRAPHY.caption,
     letterSpacing: 1,
   },
   headerRight: {
     flexDirection: 'row',
   },
   favoriteButton: {
-    padding: 4,
+    padding: SIZES.xs,
   },
   iconContainer: {
     alignItems: 'center',
-    paddingVertical: 24,
-    backgroundColor: COLORS.ivory,
-    marginBottom: 16,
+    paddingVertical: SIZES.xl,
+    backgroundColor: COLORS.surface,
+    marginBottom: SIZES.md,
   },
   iconCircle: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: COLORS.white,
+    width: 60,
+    height: 60,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
-    borderWidth: 2,
-    borderColor: COLORS.cognac,
+    marginBottom: SIZES.md,
   },
   styleTitle: {
-    fontSize: 24,
-    fontWeight: '300',
-    color: COLORS.charcoal,
+    ...TYPOGRAPHY.caption,
+    fontSize: 16,
     letterSpacing: 2,
-    marginBottom: 8,
+    marginBottom: SIZES.xs,
   },
   description: {
-    fontSize: 16,
-    color: COLORS.ash,
+    ...TYPOGRAPHY.bodySmall,
     textAlign: 'center',
-    paddingHorizontal: 32,
-    lineHeight: 22,
+    paddingHorizontal: SIZES.xl,
+    lineHeight: 18,
   },
   subTabsWrapper: {
-    paddingHorizontal: 16,
-    marginBottom: 20,
+    paddingHorizontal: SIZES.lg,
+    marginBottom: SIZES.lg,
   },
   sectionLabel: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: COLORS.ash,
-    letterSpacing: 1,
-    marginBottom: 12,
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    marginBottom: SIZES.md,
   },
   subTabsContainer: {
-    marginBottom: 8,
+    marginBottom: SIZES.sm,
   },
   subTabsContent: {
-    paddingRight: 20,
+    paddingRight: SIZES.lg,
   },
   subTab: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    marginRight: 8,
-    borderRadius: 25,
-    backgroundColor: COLORS.porcelain,
-    borderWidth: 1,
-    borderColor: COLORS.cloud,
+    paddingHorizontal: SIZES.lg,
+    paddingVertical: SIZES.sm,
+    marginRight: SIZES.sm,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
   },
   activeSubTab: {
-    backgroundColor: COLORS.cognac,
-    borderColor: COLORS.cognac,
+    backgroundColor: COLORS.black,
+    borderColor: COLORS.black,
   },
   subTabText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.ash,
+    ...TYPOGRAPHY.caption,
+    fontSize: 10,
+    color: COLORS.grayMedium,
   },
   activeSubTabText: {
     color: COLORS.white,
   },
   combinationsSection: {
-    paddingHorizontal: 16,
-    marginBottom: 24,
+    paddingHorizontal: SIZES.lg,
+    marginBottom: SIZES.lg,
   },
   sectionHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: SIZES.md,
   },
   sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: COLORS.charcoal,
-    letterSpacing: 1,
+    ...TYPOGRAPHY.caption,
+    fontSize: 11,
   },
   sectionCount: {
-    fontSize: 14,
-    color: COLORS.ash,
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium,
   },
   combinationCard: {
-    backgroundColor: COLORS.porcelain,
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 12,
+    backgroundColor: COLORS.white,
+    padding: SIZES.md,
+    marginBottom: SIZES.md,
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: COLORS.cloud,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
   },
   combinationContent: {
     flex: 1,
   },
   combinationName: {
-    fontSize: 16,
+    ...TYPOGRAPHY.bodySmall,
     fontWeight: '500',
-    color: COLORS.charcoal,
-    marginBottom: 8,
+    marginBottom: 4,
   },
   likeContainer: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   likeCount: {
-    fontSize: 14,
-    color: COLORS.ash,
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium,
     marginLeft: 4,
   },
   viewButton: {
-    backgroundColor: COLORS.cognac,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    paddingHorizontal: SIZES.md,
+    paddingVertical: 4,
   },
   viewButtonText: {
-    color: COLORS.white,
-    fontSize: 12,
-    fontWeight: '600',
-    letterSpacing: 0.5,
+    ...TYPOGRAPHY.caption,
+    fontSize: 8,
+    color: COLORS.black,
   },
   emptyContainer: {
     alignItems: 'center',
-    paddingVertical: 40,
-    backgroundColor: COLORS.porcelain,
-    borderRadius: 12,
+    paddingVertical: SIZES.xl,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
   },
   emptyText: {
-    fontSize: 14,
-    color: COLORS.ash,
-    marginTop: 12,
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium,
+    marginTop: SIZES.md,
   },
   aiSuggestion: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.ivory,
-    marginHorizontal: 16,
-    padding: 16,
-    borderRadius: 12,
-    gap: 12,
-    borderWidth: 1,
-    borderColor: COLORS.cognac,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    marginHorizontal: SIZES.lg,
+    padding: SIZES.md,
+    gap: SIZES.sm,
   },
   aiText: {
     flex: 1,
-    fontSize: 14,
-    color: COLORS.charcoal,
-    lineHeight: 20,
+    ...TYPOGRAPHY.caption,
+    fontSize: 10,
+    lineHeight: 16,
   },
 });
 

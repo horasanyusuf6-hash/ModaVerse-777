@@ -1,4 +1,4 @@
-// screens/HashtagFeedScreen.js - SADECE HATALAR DÜZELTİLDİ
+// 📁 src/screens/HashtagFeedScreen.js - LÜKS MİNİMALİST VERSİYON
 import React, { useState, useCallback, useMemo } from 'react';
 import {
   View,
@@ -10,24 +10,14 @@ import {
   SafeAreaView,
   StatusBar,
   Dimensions,
-  Alert
+  Alert,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRoute, useNavigation } from '@react-navigation/native';
+import { COLORS, TYPOGRAPHY, SIZES } from '../constants/Theme';
 
 const { width: screenWidth } = Dimensions.get('window');
-
-const COLORS = {
-  white: '#FFFFFF',
-  ivory: '#F9F6F2',
-  ash: '#888888',
-  charcoal: '#222222',
-  cloud: '#F0F0F0',
-  accent: '#8C7853',
-  like: '#E91E63',
-  success: '#4CAF50',
-  error: '#F44336',
-};
 
 const HashtagFeedScreen = () => {
   const route = useRoute();
@@ -123,6 +113,13 @@ const HashtagFeedScreen = () => {
     );
   }, []);
 
+  const formatNumber = (num) => {
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  };
+
   const renderPost = useCallback(({ item }) => (
     <View style={styles.postCard}>
       <View style={styles.postHeader}>
@@ -139,7 +136,7 @@ const HashtagFeedScreen = () => {
           onPress={() => Alert.alert('Seçenekler', 'Bu gönderi için işlemler')}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="ellipsis-horizontal" size={20} color={COLORS.ash} />
+          <Ionicons name="ellipsis-horizontal" size={18} color={COLORS.grayMedium} />
         </TouchableOpacity>
       </View>
       
@@ -161,9 +158,10 @@ const HashtagFeedScreen = () => {
         >
           <Ionicons 
             name={item.isLiked ? "heart" : "heart-outline"} 
-            size={24} 
-            color={item.isLiked ? COLORS.like : COLORS.charcoal} 
+            size={20} 
+            color={item.isLiked ? COLORS.black : COLORS.grayDark} 
           />
+          <Text style={styles.actionText}>{formatNumber(item.likes)}</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
@@ -171,7 +169,8 @@ const HashtagFeedScreen = () => {
           onPress={() => Alert.alert('Yorumlar', 'Yorumlar sayfası açılıyor...')}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="chatbubble-outline" size={24} color={COLORS.charcoal} />
+          <Ionicons name="chatbubble-outline" size={20} color={COLORS.grayDark} />
+          <Text style={styles.actionText}>{formatNumber(item.comments)}</Text>
         </TouchableOpacity>
         
         <TouchableOpacity 
@@ -179,7 +178,7 @@ const HashtagFeedScreen = () => {
           onPress={() => Alert.alert('Paylaş', 'Gönderi paylaşılıyor...')}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="paper-plane-outline" size={24} color={COLORS.charcoal} />
+          <Ionicons name="paper-plane-outline" size={20} color={COLORS.grayDark} />
         </TouchableOpacity>
         
         <TouchableOpacity 
@@ -189,14 +188,13 @@ const HashtagFeedScreen = () => {
         >
           <Ionicons 
             name={item.isSaved ? "bookmark" : "bookmark-outline"} 
-            size={24} 
-            color={item.isSaved ? COLORS.accent : COLORS.charcoal} 
+            size={20} 
+            color={item.isSaved ? COLORS.black : COLORS.grayDark} 
           />
         </TouchableOpacity>
       </View>
       
       <View style={styles.postContent}>
-        <Text style={styles.likesText}>{item.likes} beğenme</Text>
         <Text style={styles.contentText}>
           <Text style={styles.userNameText}>{item.user?.name} </Text>
           {item.content}
@@ -214,7 +212,9 @@ const HashtagFeedScreen = () => {
         </View>
         
         <TouchableOpacity onPress={() => Alert.alert('Yorumlar', 'Tüm yorumlar gösteriliyor...')}>
-          <Text style={styles.commentsText}>{item.comments} yorumun tümünü gör</Text>
+          <Text style={styles.commentsText}>
+            {item.comments} yorumun tümünü gör
+          </Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -222,16 +222,18 @@ const HashtagFeedScreen = () => {
 
   const renderEmptyList = useCallback(() => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="search-outline" size={48} color={COLORS.ash} />
-      <Text style={styles.emptyTitle}>Gönderi bulunamadı</Text>
+      <View style={styles.emptyIconContainer}>
+        <Ionicons name="hash-outline" size={40} color={COLORS.grayMedium} />
+      </View>
+      <Text style={styles.emptyTitle}>GÖNDERİ BULUNAMADI</Text>
       <Text style={styles.emptyText}>
-        #{hashtag} etiketiyle henüz gönderi yok.
+        #{hashtag} etiketiyle henüz gönderi paylaşılmamış.
       </Text>
       <TouchableOpacity 
         style={styles.emptyButton}
         onPress={() => navigation.goBack()}
       >
-        <Text style={styles.emptyButtonText}>Geri Dön</Text>
+        <Text style={styles.emptyButtonText}>GERİ DÖN</Text>
       </TouchableOpacity>
     </View>
   ), [hashtag, navigation]);
@@ -240,26 +242,29 @@ const HashtagFeedScreen = () => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
       
+      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity 
           onPress={() => navigation.goBack()}
+          style={styles.backButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="chevron-back" size={24} color={COLORS.charcoal} />
+          <Ionicons name="arrow-back" size={24} color={COLORS.black} />
         </TouchableOpacity>
         
         <View style={styles.headerCenter}>
           <Text style={styles.hashtagText}>#{hashtag}</Text>
           <Text style={styles.postCount}>
-            {totalPosts.toLocaleString()} gönderi
+            {totalPosts.toLocaleString()} GÖNDERİ
           </Text>
         </View>
         
         <TouchableOpacity 
           onPress={() => Alert.alert('Bilgi', `#${hashtag} etiketi hakkında bilgi`)}
+          style={styles.infoButton}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="information-circle-outline" size={24} color={COLORS.charcoal} />
+          <Ionicons name="information-circle-outline" size={22} color={COLORS.black} />
         </TouchableOpacity>
       </View>
 
@@ -275,67 +280,84 @@ const HashtagFeedScreen = () => {
   );
 };
 
+// ============ STILLER ============
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: COLORS.white,
   },
+  
+  // Header
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: SIZES.lg,
+    paddingVertical: SIZES.md,
     borderBottomWidth: 0.5,
-    borderBottomColor: COLORS.cloud,
+    borderBottomColor: COLORS.grayLight,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-start',
+  },
+  infoButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
   },
   headerCenter: {
     alignItems: 'center',
   },
   hashtagText: {
-    fontSize: 18,
-    fontWeight: '300',
-    color: COLORS.charcoal,
+    ...TYPOGRAPHY.body,
+    fontWeight: '500',
     letterSpacing: 0.5,
   },
   postCount: {
-    fontSize: 13,
-    fontWeight: '300',
-    color: COLORS.ash,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium,
     marginTop: 2,
   },
+  
   feedContent: {
-    paddingBottom: 20,
+    paddingBottom: SIZES.xl,
   },
+  
+  // Post Card
   postCard: {
-    marginBottom: 24,
+    marginBottom: SIZES.lg,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.grayLight,
   },
   postHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: SIZES.lg,
+    paddingVertical: SIZES.md,
   },
   userAvatar: {
     width: 40,
     height: 40,
-    borderRadius: 20,
-    backgroundColor: COLORS.ivory,
-    marginRight: 12,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    backgroundColor: COLORS.surface,
+    marginRight: SIZES.md,
   },
   userInfo: {
     flex: 1,
   },
   userName: {
-    fontSize: 15,
-    fontWeight: '400',
-    color: COLORS.charcoal,
+    ...TYPOGRAPHY.body,
+    fontWeight: '500',
     marginBottom: 2,
   },
   postTime: {
-    fontSize: 12,
-    fontWeight: '300',
-    color: COLORS.ash,
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium,
   },
   moreButton: {
     padding: 4,
@@ -343,85 +365,95 @@ const styles = StyleSheet.create({
   postImage: {
     width: screenWidth,
     height: screenWidth,
-    backgroundColor: COLORS.ivory,
+    backgroundColor: COLORS.surface,
   },
+  
+  // Post Actions
   postActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: SIZES.lg,
+    paddingVertical: SIZES.md,
   },
   postAction: {
-    marginRight: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: SIZES.lg,
+    gap: 4,
+  },
+  actionText: {
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium,
   },
   saveButton: {
     marginLeft: 'auto',
   },
+  
+  // Post Content
   postContent: {
-    paddingHorizontal: 16,
-  },
-  likesText: {
-    fontSize: 14,
-    fontWeight: '500',
-    color: COLORS.charcoal,
-    marginBottom: 8,
+    paddingHorizontal: SIZES.lg,
+    paddingBottom: SIZES.md,
   },
   contentText: {
-    fontSize: 14,
-    fontWeight: '300',
-    color: COLORS.charcoal,
+    ...TYPOGRAPHY.body,
     lineHeight: 20,
-    marginBottom: 8,
+    marginBottom: SIZES.sm,
   },
   userNameText: {
+    ...TYPOGRAPHY.body,
     fontWeight: '500',
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: 8,
+    marginBottom: SIZES.xs,
+    gap: SIZES.sm,
   },
   tagText: {
-    fontSize: 14,
-    fontWeight: '300',
-    color: COLORS.accent,
-    marginRight: 8,
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.grayMedium,
   },
   commentsText: {
-    fontSize: 14,
-    fontWeight: '300',
-    color: COLORS.ash,
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.grayMedium,
+    marginTop: 2,
   },
+  
+  // Empty State
   emptyContainer: {
     alignItems: 'center',
     justifyContent: 'center',
-    padding: 40,
+    padding: SIZES.xl,
     minHeight: 400,
   },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SIZES.lg,
+  },
   emptyTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.charcoal,
-    marginTop: 16,
-    marginBottom: 8,
+    ...TYPOGRAPHY.caption,
+    marginBottom: SIZES.sm,
   },
   emptyText: {
-    fontSize: 14,
-    color: COLORS.ash,
+    ...TYPOGRAPHY.bodySmall,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
   },
   emptyButton: {
-    marginTop: 20,
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    backgroundColor: COLORS.accent,
-    borderRadius: 8,
+    marginTop: SIZES.lg,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    paddingHorizontal: SIZES.xl,
+    paddingVertical: SIZES.md,
   },
   emptyButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
+    ...TYPOGRAPHY.button,
+    color: COLORS.black,
   },
 });
 

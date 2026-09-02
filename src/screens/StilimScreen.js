@@ -1,610 +1,1394 @@
-// 📁 src/screens/StilimScreen.js - REVİZE EDİLMİŞ (SADECE HATALAR DÜZELTİLDİ)
-import React, { useState } from 'react';
-import { 
-  View, 
-  Text, 
-  StyleSheet, 
-  ScrollView, 
-  TouchableOpacity, 
-  Image,
+// 📁 src/screens/StilimScreen.js - TAM REVİZE (FULL SCREEN NAVIGATION)
+import React, { useState, useEffect, useCallback, useContext } from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
   SafeAreaView,
   StatusBar,
+  ScrollView,
+  TouchableOpacity,
+  Image,
   Alert,
   Modal,
+  TextInput,
+  Dimensions,
+  ActivityIndicator,
+  RefreshControl,
   Platform,
-  Dimensions
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as ImagePicker from 'expo-image-picker';
+import { COLORS, TYPOGRAPHY, SIZES } from '../constants/Theme';
+import { AuthContext } from '../../App';
+import { getUserProfile, createUserProfile, updateBodyMeasurements, updateStylePreferences } from '../services/profileService';
 
-// 📏 Ekran boyutları
 const { width, height } = Dimensions.get('window');
 
-// 🎨 RENK PALETİ (SADECE cognac RENGİ DÜZELTİLDİ)
-const COLORS = {
-  white: '#FFFFFF',
-  ivory: '#F9F6F2',
-  paper: '#F5F3EF',
-  cloud: '#F0F0F0',
-  mist: '#E8E8E8',
-  ash: '#888888',
-  charcoal: '#222222',
-  noir: '#000000',
-  cognac: '#8C7853',  // ✅ DÜZELTİLDİ
-  porcelain: '#FAFAFA',
-  success: '#4CAF50',
-  warning: '#FF9800',
-  error: '#F44336',
+// ============================================================
+// 📌 TARZLAR
+// ============================================================
+const STYLES = [
+  { id: 1, name: 'Minimalist', icon: '◻️', percentage: 65, rank: 1, rankLabel: 'Birincil' },
+  { id: 2, name: 'Sokak Modası', icon: '◼️', percentage: 45, rank: 2, rankLabel: 'İkincil' },
+  { id: 3, name: 'Bohem', icon: '◽', percentage: 30, rank: 3, rankLabel: 'Üçüncül' },
+  { id: 4, name: 'Sportif', icon: '▪️', percentage: 20, rank: 4, rankLabel: 'Dördüncül' },
+  { id: 5, name: 'Lüks', icon: '◆', percentage: 15, rank: 5, rankLabel: 'Beşincil' },
+];
+
+// ============================================================
+// 📌 TARZ VERİLERİ
+// ============================================================
+const STYLE_DATA = {
+  'Minimalist': {
+    pieces: [
+      { id: 1, name: 'Oversize Blazer', brand: 'ZARA', price: 799 },
+      { id: 2, name: 'Basic Tişört', brand: 'KOTN', price: 149 },
+      { id: 3, name: 'Sneaker', brand: 'Nike', price: 1899 },
+    ],
+    missing: [
+      { id: 1, name: 'Deri Ceket', reason: 'Stiline çok yakışır', price: 1299 },
+      { id: 2, name: 'Beyaz Gömlek', reason: 'Her kombinle uyumlu', price: 399 },
+    ],
+    brands: [
+      { id: 1, name: 'COS', followers: '234K' },
+      { id: 2, name: 'Arket', followers: '128K' },
+    ],
+    saved: [
+      { id: 1, title: 'Minimalist Kombin', user: 'StyleHunter' },
+    ],
+  },
+  'Sokak Modası': {
+    pieces: [{ id: 1, name: 'Oversize Hoodie', brand: 'Supreme', price: 1299 }],
+    missing: [{ id: 1, name: 'Sneaker', reason: 'Koleksiyonunu tamamlar', price: 1899 }],
+    brands: [{ id: 1, name: 'Supreme', followers: '1.2M' }],
+    saved: [{ id: 1, title: 'Street Style', user: 'UrbanKing' }],
+  },
+  'Bohem': {
+    pieces: [{ id: 1, name: 'Maksi Elbise', brand: 'Free People', price: 2499 }],
+    missing: [{ id: 1, name: 'Saç Bandı', reason: 'Boho look tamamlar', price: 199 }],
+    brands: [{ id: 1, name: 'Free People', followers: '890K' }],
+    saved: [{ id: 1, title: 'Boho Chic', user: 'GypsySoul' }],
+  },
+  'Sportif': {
+    pieces: [{ id: 1, name: 'Eşofman Takımı', brand: 'Nike', price: 1599 }],
+    missing: [{ id: 1, name: 'Spor Ayakkabı', reason: 'Koşu için ideal', price: 1899 }],
+    brands: [{ id: 1, name: 'Nike', followers: '5.6M' }],
+    saved: [{ id: 1, title: 'Gym Look', user: 'FitFashion' }],
+  },
+  'Lüks': {
+    pieces: [{ id: 1, name: 'İpek Elbise', brand: 'Gucci', price: 4999 }],
+    missing: [{ id: 1, name: 'Deri Çanta', reason: 'Lüks dokunuş', price: 2999 }],
+    brands: [{ id: 1, name: 'Gucci', followers: '8.2M' }],
+    saved: [{ id: 1, title: 'Luxury Life', user: 'RichStyle' }],
+  },
 };
 
-// 📱 Cihaz tipi kontrolü
-const isWeb = Platform.OS === 'web';
-const isIOS = Platform.OS === 'ios';
-const isAndroid = Platform.OS === 'android';
+// ============================================================
+// 📌 BEDEN ÖLÇÜLERİ MODALI
+// ============================================================
+const BodyMeasurementsModal = ({ visible, measurements, onSave, onClose }) => {
+  const [height, setHeight] = useState(measurements?.height?.toString() || '');
+  const [weight, setWeight] = useState(measurements?.weight?.toString() || '');
+  const [topSize, setTopSize] = useState(measurements?.topSize || '');
+  const [bottomSize, setBottomSize] = useState(measurements?.bottomSize || '');
+  const [shoeSize, setShoeSize] = useState(measurements?.shoeSize?.toString() || '');
+  const [isLoading, setIsLoading] = useState(false);
+  
+  const sizeOptions = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
-// 🖼️ Base64 varsayılan avatar
-const DEFAULT_AVATAR_BASE64 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const handleSave = async () => {
+    setIsLoading(true);
+    await new Promise(resolve => setTimeout(resolve, 600));
+    onSave({
+      height: height ? Number(height) : null,
+      weight: weight ? Number(weight) : null,
+      topSize: topSize || null,
+      bottomSize: bottomSize || null,
+      shoeSize: shoeSize ? Number(shoeSize) : null,
+    });
+    setIsLoading(false);
+  };
 
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Beden Ölçüleri</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color={COLORS.black} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.rowInput}>
+              <View style={[styles.inputGroup, { flex: 1, marginRight: 8 }]}>
+                <Text style={styles.inputLabel}>Boy (cm)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="175"
+                  placeholderTextColor={COLORS.grayMedium}
+                  keyboardType="numeric"
+                  value={height}
+                  onChangeText={setHeight}
+                />
+              </View>
+              <View style={[styles.inputGroup, { flex: 1 }]}>
+                <Text style={styles.inputLabel}>Kilo (kg)</Text>
+                <TextInput
+                  style={styles.input}
+                  placeholder="70"
+                  placeholderTextColor={COLORS.grayMedium}
+                  keyboardType="numeric"
+                  value={weight}
+                  onChangeText={setWeight}
+                />
+              </View>
+            </View>
+
+            <Text style={styles.inputLabel}>Üst Beden</Text>
+            <View style={styles.sizeOptionsGrid}>
+              {sizeOptions.map(size => (
+                <TouchableOpacity 
+                  key={size}
+                  style={[styles.sizeOption, topSize === size && styles.sizeOptionActive]}
+                  onPress={() => setTopSize(size)}
+                >
+                  <Text style={[styles.sizeOptionText, topSize === size && styles.sizeOptionTextActive]}>{size}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <Text style={styles.inputLabel}>Alt Beden</Text>
+            <View style={styles.sizeOptionsGrid}>
+              {sizeOptions.map(size => (
+                <TouchableOpacity 
+                  key={size}
+                  style={[styles.sizeOption, bottomSize === size && styles.sizeOptionActive]}
+                  onPress={() => setBottomSize(size)}
+                >
+                  <Text style={[styles.sizeOptionText, bottomSize === size && styles.sizeOptionTextActive]}>{size}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TextInput 
+              style={styles.input}
+              placeholder="Ayakkabı Numarası"
+              placeholderTextColor={COLORS.grayMedium}
+              keyboardType="numeric"
+              value={shoeSize}
+              onChangeText={setShoeSize}
+            />
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity 
+                style={styles.cancelButton} 
+                onPress={onClose}
+                disabled={isLoading}
+              >
+                <Text style={styles.cancelButtonText}>İPTAL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity 
+                style={[styles.saveButtonPremium, isLoading && styles.saveButtonDisabled]} 
+                onPress={handleSave}
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <ActivityIndicator size="small" color={COLORS.white} />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={18} color={COLORS.white} />
+                    <Text style={styles.saveButtonTextPremium}>KAYDET</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// ============================================================
+// 📌 STİL TERCİHLERİ MODALI
+// ============================================================
+const StylePreferencesModal = ({ visible, preferences, onSave, onClose }) => {
+  const [favoriteColors, setFavoriteColors] = useState(preferences?.favoriteColors || []);
+  const [preferredBrands, setPreferredBrands] = useState(preferences?.preferredBrands || []);
+  const [tempColor, setTempColor] = useState('');
+  const [tempBrand, setTempBrand] = useState('');
+
+  const addToArray = (array, setArray, value, setTemp) => {
+    if (value && value.trim() && !array.includes(value.trim())) {
+      setArray([...array, value.trim()]);
+      setTemp('');
+    }
+  };
+
+  const removeFromArray = (array, setArray, value) => {
+    setArray(array.filter(item => item !== value));
+  };
+
+  const handleSave = () => {
+    onSave({
+      favoriteColors,
+      preferredBrands,
+      avoidedStyles: preferences?.avoidedStyles || [],
+      favoriteCategories: preferences?.favoriteCategories || [],
+    });
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.modalContent}>
+          <View style={styles.modalHeader}>
+            <Text style={styles.modalTitle}>Stil Tercihleri</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color={COLORS.black} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <Text style={styles.inputLabel}>Favori Renkler</Text>
+            <View style={styles.tagContainer}>
+              {favoriteColors.map((color, i) => (
+                <View key={i} style={styles.tag}>
+                  <Text style={styles.tagText}>{color}</Text>
+                  <TouchableOpacity onPress={() => removeFromArray(favoriteColors, setFavoriteColors, color)}>
+                    <Ionicons name="close-circle" size={16} color={COLORS.grayMedium} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+            <View style={styles.addRow}>
+              <TextInput 
+                style={styles.addInput}
+                placeholder="Renk ekle (örn: Mavi)"
+                placeholderTextColor={COLORS.grayMedium}
+                value={tempColor}
+                onChangeText={setTempColor}
+              />
+              <TouchableOpacity style={styles.addButton} onPress={() => addToArray(favoriteColors, setFavoriteColors, tempColor, setTempColor)}>
+                <Text style={styles.addButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.inputLabel}>Favori Markalar</Text>
+            <View style={styles.tagContainer}>
+              {preferredBrands.map((brand, i) => (
+                <View key={i} style={styles.tag}>
+                  <Text style={styles.tagText}>{brand}</Text>
+                  <TouchableOpacity onPress={() => removeFromArray(preferredBrands, setPreferredBrands, brand)}>
+                    <Ionicons name="close-circle" size={16} color={COLORS.grayMedium} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </View>
+            <View style={styles.addRow}>
+              <TextInput 
+                style={styles.addInput}
+                placeholder="Marka ekle"
+                placeholderTextColor={COLORS.grayMedium}
+                value={tempBrand}
+                onChangeText={setTempBrand}
+              />
+              <TouchableOpacity style={styles.addButton} onPress={() => addToArray(preferredBrands, setPreferredBrands, tempBrand, setTempBrand)}>
+                <Text style={styles.addButtonText}>+</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+                <Text style={styles.cancelButtonText}>İPTAL</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
+                <Text style={styles.saveButtonText}>KAYDET</Text>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// ============================================================
+// 📌 TARZ SEÇİM MODALI
+// ============================================================
+const StyleSelectionModal = ({ visible, stylesList, currentStyle, onSelect, onClose }) => {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.styleModalContainer}>
+          <View style={styles.styleModalHeader}>
+            <Text style={styles.styleModalTitle}>Tarz Seçimi</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color={COLORS.black} />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.styleModalList}>
+            {stylesList.map((style) => (
+              <TouchableOpacity
+                key={style.id}
+                style={[
+                  styles.styleModalItem,
+                  currentStyle === style.name && styles.styleModalItemActive
+                ]}
+                onPress={() => onSelect(style.name)}
+              >
+                <Text style={styles.styleModalIcon}>{style.icon}</Text>
+                <View style={styles.styleModalInfo}>
+                  <Text style={[
+                    styles.styleModalName,
+                    currentStyle === style.name && styles.styleModalNameActive
+                  ]}>
+                    {style.name}
+                  </Text>
+                  <View style={styles.styleModalRankBadge}>
+                    <Text style={styles.styleModalRankText}>{style.rankLabel} Tarz</Text>
+                  </View>
+                </View>
+                <View style={styles.styleModalPercentage}>
+                  <Text style={styles.styleModalPercentageText}>%{style.percentage}</Text>
+                </View>
+                {currentStyle === style.name && (
+                  <Ionicons name="checkmark-circle" size={20} color={COLORS.black} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// ============================================================
+// 📌 AYARLAR MENÜSÜ
+// ============================================================
+const SettingsMenuModal = ({ visible, theme, onClose, onToggleTheme, onLogout }) => {
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={styles.settingsMenuContainer}>
+          <View style={styles.settingsMenuHeader}>
+            <Text style={styles.settingsMenuTitle}>Ayarlar</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color={COLORS.black} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <View style={styles.settingsMenuSection}>
+              <Text style={styles.settingsMenuSectionTitle}>Görünüm</Text>
+              <TouchableOpacity style={styles.settingsMenuItem} onPress={onToggleTheme}>
+                <View style={styles.settingsMenuItemLeft}>
+                  <Ionicons name="moon-outline" size={20} color={COLORS.black} />
+                  <Text style={styles.settingsMenuItemText}>Karanlık Tema</Text>
+                </View>
+                <View style={[styles.themeToggle, theme === 'dark' && styles.themeToggleActive]}>
+                  <Text style={[styles.themeToggleText, theme === 'dark' && styles.themeToggleTextActive]}>
+                    {theme === 'dark' ? 'Açık' : 'Kapalı'}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.settingsMenuSection}>
+              <Text style={styles.settingsMenuSectionTitle}>Hesap</Text>
+              <TouchableOpacity style={styles.settingsMenuItem} onPress={() => Alert.alert('Bilgi', 'ModaVerse v2.0.0')}>
+                <View style={styles.settingsMenuItemLeft}>
+                  <Ionicons name="information-circle-outline" size={20} color={COLORS.black} />
+                  <Text style={styles.settingsMenuItemText}>Uygulama Versiyonu</Text>
+                </View>
+                <Text style={styles.settingsMenuItemValue}>2.0.0</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity style={[styles.settingsMenuItem, styles.logoutMenuItem]} onPress={onLogout}>
+                <View style={styles.settingsMenuItemLeft}>
+                  <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
+                  <Text style={[styles.settingsMenuItemText, styles.logoutMenuText]}>Çıkış Yap</Text>
+                </View>
+              </TouchableOpacity>
+            </View>
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// ============================================================
+// 📌 ANA BİLEŞEN - StilimScreen
+// ============================================================
 const StilimScreen = ({ navigation }) => {
-  // STATE'LER
-  const [selectedFilter, setSelectedFilter] = useState('all');
-  const [isEditModalVisible, setIsEditModalVisible] = useState(false);
-  const [userData, setUserData] = useState({
-    name: "Yağmur",
-    username: "@yagmurstyle",
-    bio: "Minimalist tarz • Sustainable fashion • İstanbul",
-    followers: "2.4K",
-    following: "356",
-    posts: "128",
-    avatar: "https://i.pravatar.cc/300?img=12"
+  const { user } = useContext(AuthContext);
+  const [firestoreProfile, setFirestoreProfile] = useState(null);
+  
+  const [profile, setProfile] = useState({
+    name: 'Moda',
+    surname: 'Sever',
+    bio: 'Moda tutkunu | Stil danışmanı | Trend takipçisi',
+    avatar: 'https://i.pravatar.cc/100?img=1',
+    coverImage: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800',
+  });
+  
+  const [currentStyle, setCurrentStyle] = useState('Minimalist');
+  const [styleData, setStyleData] = useState(STYLE_DATA['Minimalist']);
+  const [styleModalVisible, setStyleModalVisible] = useState(false);
+  
+  const [stats, setStats] = useState({
+    posts: 24,
+    followers: 1240,
+    following: 356,
+  });
+  
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [settingsMenuVisible, setSettingsMenuVisible] = useState(false);
+  const [theme, setTheme] = useState('light');
+  
+  const [bodyModalVisible, setBodyModalVisible] = useState(false);
+  const [stylePrefModalVisible, setStylePrefModalVisible] = useState(false);
+  const [bodyMeasurements, setBodyMeasurements] = useState({
+    height: null, weight: null, topSize: null, bottomSize: null, shoeSize: null
+  });
+  const [stylePreferences, setStylePreferences] = useState({
+    favoriteColors: [], preferredBrands: [], avoidedStyles: [], favoriteCategories: []
   });
 
-  // Stil istatistikleri (icon isimleri düzeltildi)
-  const [styleStats, setStyleStats] = useState([
-    { id: 1, title: "Minimal", value: 85, icon: "leaf-outline", color: COLORS.cognac },
-    { id: 2, title: "Street", value: 45, icon: "shirt-outline", color: COLORS.charcoal },
-    { id: 3, title: "Classic", value: 60, icon: "briefcase-outline", color: COLORS.ash },
-    { id: 4, title: "Luxury", value: 30, icon: "diamond-outline", color: COLORS.cognac },
-  ]);
-
-  // Son aktiviteler
-  const [recentActivities, setRecentActivities] = useState([
-    { id: 1, type: "like", target: "Siyah Deri Ceket", time: "2s ago", icon: "💎" },
-    { id: 2, type: "save", target: "Beyaz Tişört", time: "1d ago", icon: "💼" },
-    { id: 3, type: "follow", target: "ZARA", time: "2d ago", icon: "🏷️" },
-    { id: 4, type: "purchase", target: "Spor Ayakkabı", time: "1w ago", icon: "📌" },
-  ]);
-
-  // Önerilen stiller
-  const [recommendedStyles, setRecommendedStyles] = useState([
-    { id: 1, name: "Boho Chic", match: 92, image: "https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=400" },
-    { id: 2, name: "Sporty", match: 78, image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400" },
-    { id: 3, name: "Business Casual", match: 65, image: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400" },
-  ]);
-
-  // Güvenli navigasyon
-  const safeNavigate = (screenName, params = {}) => {
-    if (navigation && navigation.navigate) {
-      navigation.navigate(screenName, params);
-    } else {
-      console.warn(`Navigation to ${screenName} failed`);
-      Alert.alert("Bilgi", `${screenName} sayfasına yönlendiriliyor...`);
-    }
+  const getUserTitle = () => {
+    if (stats.followers >= 10000) return 'MODA İKONU';
+    if (stats.followers >= 5000) return 'TREND BELİRLEYİCİ';
+    if (stats.followers >= 1000) return 'STİL GURUSU';
+    return 'MODA SEVER';
   };
 
-  // Cross-platform prompt
-  const showPrompt = (title, message, defaultValue, onConfirm) => {
-    if (isWeb) {
-      const result = prompt(message, defaultValue);
-      if (result !== null && result.trim()) {
-        onConfirm(result);
+  useEffect(() => {
+    if (user) {
+      loadFirestoreProfile();
+    }
+  }, [user]);
+
+  const loadFirestoreProfile = async () => {
+    const result = await getUserProfile(user.uid);
+    if (result.success) {
+      setFirestoreProfile(result.data);
+      if (result.data.bodyMeasurements) {
+        setBodyMeasurements(result.data.bodyMeasurements);
       }
-    } else {
-      Alert.prompt(
-        title,
-        message,
-        [
-          { text: "İptal", style: "cancel" },
-          { text: "Kaydet", onPress: (value) => {
-              if (value && value.trim()) {
-                onConfirm(value);
-              }
-            }
-          }
-        ],
-        'plain-text',
-        defaultValue
-      );
+      if (result.data.stylePreferences) {
+        setStylePreferences(result.data.stylePreferences);
+      }
+    } else if (result.notFound) {
+      const createResult = await createUserProfile(user.uid, user.email);
+      if (createResult.success) {
+        setFirestoreProfile(createResult.data);
+      }
     }
   };
 
-  // Profil Düzenleme
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    try {
+      const savedProfile = await AsyncStorage.getItem('@user_profile');
+      if (savedProfile) {
+        const parsedProfile = JSON.parse(savedProfile);
+        setProfile({
+          name: parsedProfile.name || 'Moda',
+          surname: parsedProfile.surname || 'Sever',
+          bio: parsedProfile.bio || 'Moda tutkunu | Stil danışmanı | Trend takipçisi',
+          avatar: parsedProfile.avatar || 'https://i.pravatar.cc/100?img=1',
+          coverImage: parsedProfile.coverImage || 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800',
+        });
+      }
+    } catch (error) {
+      console.error('Veri yüklenirken hata:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const saveProfile = async (newProfile) => {
+    try {
+      await AsyncStorage.setItem('@user_profile', JSON.stringify(newProfile));
+      setProfile(newProfile);
+      Alert.alert('Başarılı', 'Profil güncellendi!');
+    } catch (error) {
+      console.error('Profil kaydedilirken hata:', error);
+    }
+  };
+
+  const handleSaveBodyMeasurements = async (measurements) => {
+    const result = await updateBodyMeasurements(user.uid, measurements);
+    if (result.success) {
+      setBodyMeasurements(measurements);
+      Alert.alert('Başarılı', 'Beden ölçüleriniz kaydedildi.');
+      setBodyModalVisible(false);
+    } else {
+      Alert.alert('Hata', 'Kaydedilemedi: ' + result.error);
+    }
+  };
+
+  const handleSaveStylePreferences = async (preferences) => {
+    const result = await updateStylePreferences(user.uid, preferences);
+    if (result.success) {
+      setStylePreferences(preferences);
+      Alert.alert('Başarılı', 'Stil tercihleriniz kaydedildi.');
+      setStylePrefModalVisible(false);
+    } else {
+      Alert.alert('Hata', 'Kaydedilemedi: ' + result.error);
+    }
+  };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await loadData();
+    if (user) await loadFirestoreProfile();
+    setTimeout(() => setRefreshing(false), 1000);
+  }, [user]);
+
+  const handleStyleSelect = (styleName) => {
+    setCurrentStyle(styleName);
+    setStyleData(STYLE_DATA[styleName] || STYLE_DATA['Minimalist']);
+    setStyleModalVisible(false);
+  };
+
+  // ============================================================
+  // 📌 NAVIGASYON - FULL SCREEN SAYFALARA YÖNLENDİRME
+  // ============================================================
+  
+  // 🆕 Stil Kimliği detaylarına git
+  const handleIdentityPress = (type) => {
+    let title = '';
+    let items = [];
+    
+    switch (type) {
+      case 'pieces':
+        title = 'Tarzın Parçaları';
+        items = styleData.pieces || [];
+        break;
+      case 'missing':
+        title = 'Tarzın Eksikleri';
+        items = styleData.missing || [];
+        break;
+      case 'brands':
+        title = 'Tarzın Markaları';
+        items = styleData.brands || [];
+        break;
+      case 'saved':
+        title = 'Kaydedilen Gönderiler';
+        items = styleData.saved || [];
+        break;
+    }
+    
+    // 🆕 IdentityGalleryScreen'e yönlendir
+    navigation.navigate('IdentityGallery', { 
+      title, 
+      items,
+      type 
+    });
+  };
+
+  // 🆕 İstatistiklere tıklama - FULL SCREEN SAYFALAR
+  const handleStatsPress = (type) => {
+    if (type === 'posts') {
+      // PostsGalleryScreen'e git
+      navigation.navigate('PostsGallery');
+    } else if (type === 'followers') {
+      // FollowersScreen'e git
+      navigation.navigate('Followers', { type: 'followers' });
+    } else if (type === 'following') {
+      // FollowersScreen'e git (takip edilenler)
+      navigation.navigate('Followers', { type: 'following' });
+    }
+  };
+
+  // 🆕 Profil düzenleme - EditProfileScreen'e git
   const handleEditProfile = () => {
-    if (isIOS || isAndroid) {
-      Alert.alert(
-        "Profil Düzenle",
-        "Hangi bilgiyi düzenlemek istiyorsun?",
-        [
-          { text: "İsim", onPress: () => showPrompt("İsim Değiştir", "Yeni isminiz:", userData.name, (newName) => {
-              setUserData({...userData, name: newName});
-              Alert.alert("✅ Başarılı", "İsim güncellendi!");
-            })
-          },
-          { text: "Kullanıcı Adı", onPress: () => showPrompt("Kullanıcı Adı Değiştir", "Yeni kullanıcı adınız:", userData.username.replace('@', ''), (newUsername) => {
-              setUserData({...userData, username: `@${newUsername}`});
-              Alert.alert("✅ Başarılı", "Kullanıcı adı güncellendi!");
-            })
-          },
-          { text: "Bio", onPress: () => showPrompt("Bio Değiştir", "Yeni bio:", userData.bio, (newBio) => {
-              setUserData({...userData, bio: newBio});
-              Alert.alert("✅ Başarılı", "Bio güncellendi!");
-            })
-          },
-          { text: "İptal", style: "cancel" }
-        ]
-      );
-    } else {
-      const action = prompt("Ne düzenlemek istiyorsunuz? (isim/kullanıcı/bio):");
-      if (action === 'isim') {
-        const newName = prompt("Yeni isminiz:", userData.name);
-        if (newName) setUserData({...userData, name: newName});
-      } else if (action === 'kullanıcı') {
-        const newUsername = prompt("Yeni kullanıcı adınız:", userData.username.replace('@', ''));
-        if (newUsername) setUserData({...userData, username: `@${newUsername}`});
-      } else if (action === 'bio') {
-        const newBio = prompt("Yeni bio:", userData.bio);
-        if (newBio) setUserData({...userData, bio: newBio});
-      }
-    }
+    navigation.navigate('EditProfile', {
+      profile,
+      onSave: saveProfile,
+    });
   };
 
-  const handleFavoritesPress = () => {
-    safeNavigate('Koleksiyonum');
+  const handleToggleTheme = () => {
+    const newTheme = theme === 'light' ? 'dark' : 'light';
+    setTheme(newTheme);
+    Alert.alert('Tema Değiştirildi', `${newTheme === 'dark' ? 'Karanlık' : 'Aydınlık'} tema aktif.`);
   };
 
-  const handleActivityPress = (activity) => {
-    let message = '';
-    let targetScreen = '';
-    let targetParams = {};
-    
-    switch(activity.type) {
-      case 'like':
-        message = `"${activity.target}" ürününü beğendiniz`;
-        targetScreen = 'Koleksiyonum';
-        targetParams = { filter: 'likes' };
-        break;
-      case 'save':
-        message = `"${activity.target}" ürününü kaydettiniz`;
-        targetScreen = 'Koleksiyonum';
-        targetParams = { filter: 'saved' };
-        break;
-      case 'follow':
-        message = `"${activity.target}" markasını takip etmeye başladınız`;
-        targetScreen = 'Tasarimcim';
-        targetParams = { brand: activity.target };
-        break;
-      case 'purchase':
-        message = `"${activity.target}" ürününü satın aldınız`;
-        targetScreen = 'Siparislerim';
-        targetParams = { orderId: activity.id };
-        break;
-      default:
-        message = `Aktivite: ${activity.target}`;
-        targetScreen = 'AnaSayfa';
-    }
-    
-    Alert.alert("📋 Aktivite Detayı", message, [
-      { text: "Git", onPress: () => safeNavigate(targetScreen, targetParams) },
-      { text: "Tamam", style: "cancel" }
-    ]);
+  const handleLogout = () => {
+    Alert.alert(
+      'Çıkış Yap',
+      'Oturumunuzu kapatmak istediğinize emin misiniz?',
+      [
+        { text: 'İptal', style: 'cancel' },
+        { text: 'Çıkış Yap', style: 'destructive', onPress: () => navigation?.replace('Onboarding') }
+      ]
+    );
   };
 
-  const handleQuickAction = (action) => {
-    switch(action) {
-      case 'favorites':
-        safeNavigate('Koleksiyonum');
-        break;
-      case 'orders':
-        Alert.alert("📦 Siparişlerim", "Siparişleriniz yükleniyor...", [
-          { text: "Detaylar", onPress: () => safeNavigate('Siparislerim') },
-          { text: "Tamam" }
-        ]);
-        break;
-      case 'reviews':
-        Alert.alert("⭐ İncelemelerim", "İncelemeleriniz yükleniyor...", [
-          { text: "Detaylar", onPress: () => safeNavigate('Incelemelerim') },
-          { text: "Tamam" }
-        ]);
-        break;
-      case 'settings':
-        Alert.alert("⚙️ Ayarlar", "Ayarlar sayfasına yönlendiriliyorsunuz...", [
-          { text: "Git", onPress: () => safeNavigate('Ayarlar') },
-          { text: "Tamam" }
-        ]);
-        break;
-      default:
-        Alert.alert("ℹ️ Bilgi", `${action} özelliği yakında eklenecek!`);
-    }
-  };
-
-  const updateStyleStats = () => {
-    const updatedStats = styleStats.map(stat => ({
-      ...stat,
-      value: Math.min(100, stat.value + Math.floor(Math.random() * 10))
-    }));
-    setStyleStats(updatedStats);
-    
-    const newRecommendations = [
-      { id: 1, name: "Boho Chic", match: Math.floor(Math.random() * 30 + 70), image: "https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=400" },
-      { id: 2, name: "Sporty", match: Math.floor(Math.random() * 30 + 70), image: "https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400" },
-      { id: 3, name: "Business Casual", match: Math.floor(Math.random() * 30 + 70), image: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=400" },
-    ];
-    setRecommendedStyles(newRecommendations);
-    
-    Alert.alert("🎨 Stil Analizi", "Stil istatistikleriniz güncellendi! AI size yeni stiller öneriyor.", [
-      { text: "Önerileri Gör", onPress: () => {} },
-      { text: "Tamam" }
-    ]);
-  };
-
-  const filterActivities = (filter) => {
-    setSelectedFilter(filter);
-    
-    const allActivities = [
-      { id: 1, type: "like", target: "Siyah Deri Ceket", time: "2s ago", icon: "💎" },
-      { id: 2, type: "save", target: "Beyaz Tişört", time: "1d ago", icon: "💼" },
-      { id: 3, type: "follow", target: "ZARA", time: "2d ago", icon: "🏷️" },
-      { id: 4, type: "purchase", target: "Spor Ayakkabı", time: "1w ago", icon: "📌" },
-      { id: 5, type: "like", target: "Kot Ceket", time: "3d ago", icon: "💎" },
-      { id: 6, type: "save", target: "Deri Bot", time: "5d ago", icon: "💼" },
-    ];
-    
-    if (filter === 'all') {
-      setRecentActivities(allActivities.slice(0, 4));
-    } else {
-      const filtered = allActivities.filter(activity => activity.type === filter).slice(0, 4);
-      setRecentActivities(filtered);
-    }
-  };
-
-  const viewAllActivities = () => {
-    Alert.alert("📊 Tüm Aktiviteler", "Toplam 6 aktiviteniz bulunuyor. Detaylı liste için tıklayın.", [
-      { text: "Detaylı Gör", onPress: () => safeNavigate('Aktiviteler') },
-      { text: "Tamam" }
-    ]);
-  };
-
-  const changeAvatar = () => {
-    Alert.alert("📸 Profil Fotoğrafı", "Fotoğrafınızı nasıl değiştirmek istiyorsunuz?", [
-      { text: "📷 Kamera", onPress: () => { Alert.alert("Kamera", "Kamera açılıyor...", [
-          { text: "Fotoğraf Çek", onPress: () => safeNavigate('Kamera') },
-          { text: "İptal", style: "cancel" }
-        ]);
-      }},
-      { text: "🖼️ Galeri", onPress: () => { Alert.alert("Galeri", "Galeri açılıyor...", [
-          { text: "Fotoğraf Seç", onPress: () => {
-              const randomAvatar = `https://i.pravatar.cc/300?img=${Math.floor(Math.random() * 70)}`;
-              setUserData({...userData, avatar: randomAvatar});
-              Alert.alert("✅ Başarılı", "Profil fotoğrafı değiştirildi!");
-            }
-          },
-          { text: "İptal", style: "cancel" }
-        ]);
-      }},
-      { text: "🎲 Rastgele", onPress: () => {
-          const newAvatar = `https://i.pravatar.cc/300?img=${Math.floor(Math.random() * 70)}`;
-          setUserData({...userData, avatar: newAvatar});
-          Alert.alert("✅ Başarılı", "Profil fotoğrafı değiştirildi!");
-        }
-      },
-      { text: "İptal", style: "cancel" }
-    ]);
-  };
-
-  const handleStyleRecommendation = (style) => {
-    Alert.alert(`✨ ${style.name}`, `Bu stile %${style.match} oranında uyuyorsunuz.\n\nSize özel kombin önerileri için tıklayın.`, [
-      { text: "Kombinleri Gör", onPress: () => safeNavigate('Kombinler', { style: style.name }) },
-      { text: "Tamam" }
-    ]);
-  };
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={COLORS.black} />
+          <Text style={styles.loadingText}>Yükleniyor...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
       
-      <View style={styles.header}>
-        <View style={styles.logoContainer}>
-          <Text style={styles.logo}>STİLİM</Text>
-        </View>
-        <Text style={styles.subtitle}>Kişisel Stil Profilim</Text>
-      </View>
-
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
-        {/* PROFİL BÖLÜMÜ */}
-        <View style={styles.profileSection}>
-          <TouchableOpacity style={styles.avatarContainer} onPress={changeAvatar} activeOpacity={0.8}>
-            <Image source={{ uri: userData.avatar }} style={styles.avatar} defaultSource={{ uri: DEFAULT_AVATAR_BASE64 }} />
-            <TouchableOpacity style={styles.editBadge} onPress={changeAvatar}>
+      <ScrollView 
+        showsVerticalScrollIndicator={false} 
+        contentContainerStyle={styles.scrollContent}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.black} />}
+      >
+        {/* Kapak Fotoğraflı Profil */}
+        <View style={styles.profileContainer}>
+          <Image source={{ uri: profile.coverImage }} style={styles.coverImage} />
+          <View style={styles.profileOverlay} />
+          
+          <View style={styles.profileHeader}>
+            <TouchableOpacity style={styles.editCoverButton} onPress={handleEditProfile}>
               <Ionicons name="camera-outline" size={14} color={COLORS.white} />
+              <Text style={styles.editCoverText}>Kapak Değiştir</Text>
             </TouchableOpacity>
+            
+            <TouchableOpacity style={styles.settingsButton} onPress={() => setSettingsMenuVisible(true)}>
+              <Ionicons name="menu-outline" size={22} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.avatarContainer}>
+            <Image source={{ uri: profile.avatar }} style={styles.avatar} />
+            <TouchableOpacity style={styles.editAvatarButton} onPress={handleEditProfile}>
+              <Ionicons name="camera" size={12} color={COLORS.white} />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Profil Bilgileri */}
+        <View style={styles.profileInfo}>
+          <Text style={styles.profileName}>{profile.name} {profile.surname}</Text>
+          <Text style={styles.titleText}>{getUserTitle()}</Text>
+          <Text style={styles.profileBio}>{profile.bio}</Text>
+        </View>
+
+        {/* İstatistik */}
+        <View style={styles.statsContainer}>
+          <TouchableOpacity style={styles.statItem} onPress={() => handleStatsPress('posts')}>
+            <Text style={styles.statNumber}>{stats.posts}</Text>
+            <Text style={styles.statLabel}>PAYLAŞIM</Text>
           </TouchableOpacity>
-          
-          <Text style={styles.userName}>{userData.name}</Text>
-          <Text style={styles.userUsername}>{userData.username}</Text>
-          <Text style={styles.userBio}>{userData.bio}</Text>
-          
-          <TouchableOpacity style={styles.editButton} onPress={handleEditProfile} activeOpacity={0.7}>
-            <Ionicons name="create-outline" size={16} color={COLORS.cognac} />
-            <Text style={styles.editButtonText}>Profili Düzenle</Text>
+          <View style={styles.statDivider} />
+          <TouchableOpacity style={styles.statItem} onPress={() => handleStatsPress('followers')}>
+            <Text style={styles.statNumber}>{stats.followers}</Text>
+            <Text style={styles.statLabel}>TAKİPÇİ</Text>
           </TouchableOpacity>
-          
-          <View style={styles.statsContainer}>
-            <TouchableOpacity style={styles.statItem} onPress={() => safeNavigate('Gonderilerim')}>
-              <Text style={styles.statNumber}>{userData.posts}</Text>
-              <Text style={styles.statLabel}>Gönderi</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.statItem} onPress={() => safeNavigate('Takipciler')}>
-              <Text style={styles.statNumber}>{userData.followers}</Text>
-              <Text style={styles.statLabel}>Takipçi</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.statItem} onPress={() => safeNavigate('TakipEdilenler')}>
-              <Text style={styles.statNumber}>{userData.following}</Text>
-              <Text style={styles.statLabel}>Takip</Text>
-            </TouchableOpacity>
-          </View>
+          <View style={styles.statDivider} />
+          <TouchableOpacity style={styles.statItem} onPress={() => handleStatsPress('following')}>
+            <Text style={styles.statNumber}>{stats.following}</Text>
+            <Text style={styles.statLabel}>TAKİP</Text>
+          </TouchableOpacity>
         </View>
 
-        {/* AI STİL ÖNERİLERİ */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>🤖 AI Stil Önerileri</Text>
-              <Text style={styles.sectionSubtitle}>Size özel seçildi</Text>
-            </View>
-            <TouchableOpacity onPress={updateStyleStats}>
-              <Text style={styles.seeAllText}>Yenile</Text>
-            </TouchableOpacity>
+        {/* BEDEN ÖLÇÜLERİ KARTI */}
+        <TouchableOpacity style={styles.infoCard} onPress={() => setBodyModalVisible(true)}>
+          <View style={styles.infoCardHeader}>
+            <Ionicons name="body-outline" size={20} color={COLORS.black} />
+            <Text style={styles.infoCardTitle}>Beden Ölçüleri</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.grayMedium} style={{ marginLeft: 'auto' }} />
           </View>
-          
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.recommendationsScroll}>
-            {recommendedStyles.map((style) => (
-              <TouchableOpacity key={style.id} style={styles.recommendationCard} onPress={() => handleStyleRecommendation(style)}>
-                <Image source={{ uri: style.image }} style={styles.recommendationImage} />
-                <View style={styles.recommendationOverlay}>
-                  <Text style={styles.recommendationName}>{style.name}</Text>
-                  <View style={styles.matchBadge}>
-                    <Text style={styles.matchText}>%{style.match}</Text>
-                  </View>
-                </View>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* STİL İSTATİSTİKLERİ */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>🎨 Stil Analizim</Text>
-              <Text style={styles.sectionSubtitle}>AI tarz eşleştirme ile kişiselleştirildi</Text>
-            </View>
-            <TouchableOpacity onPress={updateStyleStats}>
-              <Text style={styles.seeAllText}>Analiz Et</Text>
-            </TouchableOpacity>
+          <View style={styles.infoCardPreview}>
+            <Text style={styles.previewText}>{bodyMeasurements.height ? `${bodyMeasurements.height} cm` : 'Boy: —'}</Text>
+            <Text style={styles.previewText}>{bodyMeasurements.topSize ? `${bodyMeasurements.topSize}` : 'Beden: —'}</Text>
+            <Text style={styles.previewText}>{bodyMeasurements.shoeSize ? `${bodyMeasurements.shoeSize} numara` : 'Ayakkabı: —'}</Text>
           </View>
-          
-          <View style={styles.statsGrid}>
-            {styleStats.map((stat) => (
-              <TouchableOpacity key={stat.id} style={styles.styleStat} onPress={() => Alert.alert(`📊 ${stat.title} Stili`, `${stat.title} tarzına %${stat.value} oranında uyuyorsunuz.`)}>
-                <View style={[styles.statIconContainer, { backgroundColor: stat.color }]}>
-                  <Ionicons name={stat.icon} size={18} color={COLORS.white} />
-                </View>
-                <Text style={[styles.statValue, { color: stat.color }]}>%{stat.value}</Text>
-                <Text style={styles.statTitle}>{stat.title}</Text>
-              </TouchableOpacity>
-            ))}
-          </View>
-        </View>
-
-        {/* AKTİVİTE FİLTRELERİ */}
-        <View style={styles.filterSection}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {[
-              { id: 'all', label: 'Tümü' },
-              { id: 'like', label: '❤️ Beğeniler' },
-              { id: 'save', label: '💾 Kaydedilenler' },
-              { id: 'follow', label: '👥 Takip' },
-              { id: 'purchase', label: '🛍️ Satın Alımlar' }
-            ].map((filter) => (
-              <TouchableOpacity
-                key={filter.id}
-                style={[styles.filterButton, selectedFilter === filter.id && styles.filterButtonActive]}
-                onPress={() => filterActivities(filter.id)}
-              >
-                <Text style={[styles.filterText, selectedFilter === filter.id && styles.filterTextActive]}>
-                  {filter.label}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* SON AKTİVİTELER */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View>
-              <Text style={styles.sectionTitle}>📋 Son Aktiviteler</Text>
-              <Text style={styles.sectionSubtitle}>En son yaptıkların</Text>
-            </View>
-            <TouchableOpacity onPress={viewAllActivities}>
-              <Text style={styles.seeAllText}>Tümü</Text>
-            </TouchableOpacity>
-          </View>
-          
-          {recentActivities.length > 0 ? (
-            recentActivities.map((activity) => (
-              <TouchableOpacity key={activity.id} style={styles.activityItem} onPress={() => handleActivityPress(activity)} activeOpacity={0.7}>
-                <View style={styles.activityLeft}>
-                  <View style={[styles.activityIcon, { backgroundColor: COLORS.porcelain }]}>
-                    <Text style={styles.activityIconText}>{activity.icon}</Text>
-                  </View>
-                  <View style={styles.activityInfo}>
-                    <Text style={styles.activityText}>
-                      <Text style={styles.activityAction}>
-                        {activity.type === 'like' && 'Beğendin: '}
-                        {activity.type === 'save' && 'Kaydettin: '}
-                        {activity.type === 'follow' && 'Takip ettin: '}
-                        {activity.type === 'purchase' && 'Satın aldın: '}
-                      </Text>
-                      <Text style={styles.activityTarget}>{activity.target}</Text>
-                    </Text>
-                    <Text style={styles.activityTime}>{activity.time}</Text>
-                  </View>
-                </View>
-                <Ionicons name="chevron-forward-outline" size={16} color={COLORS.ash} />
-              </TouchableOpacity>
-            ))
-          ) : (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyText}>Bu kategoride aktivite bulunmuyor.</Text>
-              <TouchableOpacity style={styles.emptyButton} onPress={() => filterActivities('all')}>
-                <Text style={styles.emptyButtonText}>Tümünü Göster</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* HIZLI ERİŞİM */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>⚡ Hızlı Erişim</Text>
-          <Text style={styles.sectionSubtitle}>Sık kullanılan sayfalar</Text>
-          
-          <View style={styles.quickActions}>
-            <TouchableOpacity style={styles.quickAction} onPress={() => handleQuickAction('favorites')} activeOpacity={0.7}>
-              <View style={[styles.quickIcon, { backgroundColor: COLORS.porcelain }]}>
-                <Text style={styles.quickIconText}>💎</Text>
-              </View>
-              <Text style={styles.quickText}>Favorilerim</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.quickAction} onPress={() => handleQuickAction('orders')} activeOpacity={0.7}>
-              <View style={[styles.quickIcon, { backgroundColor: COLORS.porcelain }]}>
-                <Text style={styles.quickIconText}>💼</Text>
-              </View>
-              <Text style={styles.quickText}>Siparişlerim</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.quickAction} onPress={() => handleQuickAction('reviews')} activeOpacity={0.7}>
-              <View style={[styles.quickIcon, { backgroundColor: COLORS.porcelain }]}>
-                <Text style={styles.quickIconText}>🏷️</Text>
-              </View>
-              <Text style={styles.quickText}>İncelemelerim</Text>
-            </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.quickAction} onPress={() => handleQuickAction('settings')} activeOpacity={0.7}>
-              <View style={[styles.quickIcon, { backgroundColor: COLORS.porcelain }]}>
-                <Text style={styles.quickIconText}>⚙️</Text>
-              </View>
-              <Text style={styles.quickText}>Ayarlar</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-
-        {/* ÇIKIŞ YAP BUTONU */}
-        <TouchableOpacity style={styles.logoutButton} onPress={() => {
-          Alert.alert("🚪 Çıkış Yap", "Hesabınızdan çıkmak istediğinize emin misiniz?", [
-            { text: "İptal", style: "cancel" },
-            { text: "Çıkış Yap", onPress: () => Alert.alert("✅", "Başarıyla çıkış yapıldı."), style: "destructive" }
-          ]);
-        }}>
-          <Ionicons name="log-out-outline" size={20} color={COLORS.error} />
-          <Text style={styles.logoutText}>Çıkış Yap</Text>
         </TouchableOpacity>
+
+        {/* STİL TERCİHLERİ KARTI */}
+        <TouchableOpacity style={styles.infoCard} onPress={() => setStylePrefModalVisible(true)}>
+          <View style={styles.infoCardHeader}>
+            <Ionicons name="color-palette-outline" size={20} color={COLORS.black} />
+            <Text style={styles.infoCardTitle}>Stil Tercihleri</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.grayMedium} style={{ marginLeft: 'auto' }} />
+          </View>
+          <View style={styles.infoCardPreview}>
+            {stylePreferences.favoriteColors?.slice(0, 3).map((color, i) => (
+              <View key={i} style={styles.previewTag}>
+                <Text style={styles.previewTagText}>{color}</Text>
+              </View>
+            ))}
+            {(stylePreferences.favoriteColors?.length === 0) && (
+              <Text style={styles.previewText}>Renk tercihi eklenmedi</Text>
+            )}
+          </View>
+        </TouchableOpacity>
+
+        {/* Stil Kimliğim */}
+        <View style={styles.sectionHeader}>
+          <Text style={styles.sectionTitle}>STİL KİMLİĞİM</Text>
+          <TouchableOpacity onPress={() => setStyleModalVisible(true)}>
+            <Text style={styles.sectionLink}>Tüm Tarzlar</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Aktif Tarz Özet Kartı */}
+        <TouchableOpacity 
+          style={styles.activeStyleCard}
+          onPress={() => setStyleModalVisible(true)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.activeStyleLeft}>
+            <Text style={styles.activeStyleIcon}>{STYLES.find(s => s.name === currentStyle)?.icon}</Text>
+            <View>
+              <Text style={styles.activeStyleName}>{currentStyle}</Text>
+              <Text style={styles.activeStyleRank}>Birincil Tarzın</Text>
+            </View>
+          </View>
+          <View style={styles.activeStyleRight}>
+            <Text style={styles.activeStylePercentage}>%{STYLES.find(s => s.name === currentStyle)?.percentage}</Text>
+            <Ionicons name="chevron-forward" size={16} color={COLORS.grayMedium} />
+          </View>
+        </TouchableOpacity>
+
+        {/* Stil Kimliği Grid */}
+        <View style={styles.identityGrid}>
+          <TouchableOpacity style={styles.identityCard} onPress={() => handleIdentityPress('pieces')}>
+            <Ionicons name="shirt-outline" size={24} color={COLORS.black} />
+            <Text style={styles.identityTitle}>Parçalar</Text>
+            <Text style={styles.identityCount}>{styleData.pieces?.length || 0}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.identityCard} onPress={() => handleIdentityPress('missing')}>
+            <Ionicons name="alert-circle-outline" size={24} color={COLORS.black} />
+            <Text style={styles.identityTitle}>Eksikler</Text>
+            <Text style={styles.identityCount}>{styleData.missing?.length || 0}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.identityCard} onPress={() => handleIdentityPress('brands')}>
+            <Ionicons name="business-outline" size={24} color={COLORS.black} />
+            <Text style={styles.identityTitle}>Markalar</Text>
+            <Text style={styles.identityCount}>{styleData.brands?.length || 0}</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity style={styles.identityCard} onPress={() => handleIdentityPress('saved')}>
+            <Ionicons name="bookmark-outline" size={24} color={COLORS.black} />
+            <Text style={styles.identityTitle}>Kaydedilen</Text>
+            <Text style={styles.identityCount}>{styleData.saved?.length || 0}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* AI Kombin Öneri Butonu */}
+        <TouchableOpacity 
+          style={styles.aiSuggestionButton}
+          onPress={() => navigation.navigate('OutfitSuggestion')}
+        >
+          <Ionicons name="sparkles-outline" size={24} color={COLORS.white} />
+          <View style={styles.aiSuggestionText}>
+            <Text style={styles.aiSuggestionTitle}>YAPAY ZEKA KOMBİN ÖNER</Text>
+            <Text style={styles.aiSuggestionSubtitle}>Gardırobuna göre stil önerileri al</Text>
+          </View>
+          <Ionicons name="arrow-forward" size={20} color={COLORS.white} />
+        </TouchableOpacity>
+
+        {/* Tüm Tarzlar Listesi */}
+        <View style={styles.allStylesSection}>
+          <Text style={styles.allStylesTitle}>TÜM TARZLARIM</Text>
+          {STYLES.map((style) => (
+            <TouchableOpacity 
+              key={style.id}
+              style={styles.miniStyleItem}
+              onPress={() => handleStyleSelect(style.name)}
+            >
+              <View style={styles.miniStyleLeft}>
+                <Text style={styles.miniStyleIcon}>{style.icon}</Text>
+                <View>
+                  <Text style={styles.miniStyleName}>{style.name}</Text>
+                  <Text style={styles.miniStyleRank}>{style.rankLabel}</Text>
+                </View>
+              </View>
+              <Text style={styles.miniStylePercentage}>%{style.percentage}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
       </ScrollView>
 
-      <Modal animationType="slide" transparent={true} visible={isEditModalVisible} onRequestClose={() => setIsEditModalVisible(false)}>
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            <Text style={styles.modalTitle}>Profil Düzenle</Text>
-            <Text style={styles.modalText}>Bu özellik yakında eklenecek!</Text>
-            <TouchableOpacity style={styles.modalCloseButton} onPress={() => setIsEditModalVisible(false)}>
-              <Text style={styles.modalCloseText}>Kapat</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      {/* Modallar */}
+      <StyleSelectionModal
+        visible={styleModalVisible}
+        stylesList={STYLES}
+        currentStyle={currentStyle}
+        onSelect={handleStyleSelect}
+        onClose={() => setStyleModalVisible(false)}
+      />
+
+      <SettingsMenuModal
+        visible={settingsMenuVisible}
+        theme={theme}
+        onClose={() => setSettingsMenuVisible(false)}
+        onToggleTheme={handleToggleTheme}
+        onLogout={handleLogout}
+      />
+
+      <BodyMeasurementsModal
+        visible={bodyModalVisible}
+        measurements={bodyMeasurements}
+        onSave={handleSaveBodyMeasurements}
+        onClose={() => setBodyModalVisible(false)}
+      />
+
+      <StylePreferencesModal
+        visible={stylePrefModalVisible}
+        preferences={stylePreferences}
+        onSave={handleSaveStylePreferences}
+        onClose={() => setStylePrefModalVisible(false)}
+      />
     </SafeAreaView>
   );
 };
 
-// 🎨 STYLES (tüm stiller aynen korundu)
+// ============================================================
+// 📌 STILLER
+// ============================================================
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: COLORS.white },
-  scrollContent: { paddingBottom: 30 },
-  header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: COLORS.cloud },
-  logoContainer: { marginBottom: 4 },
-  logo: { fontSize: 24, fontWeight: '300', letterSpacing: 3, color: COLORS.charcoal, textAlign: 'center' },
-  subtitle: { fontSize: 14, fontWeight: '400', color: COLORS.ash, textAlign: 'center', letterSpacing: 1 },
-  profileSection: { alignItems: 'center', padding: 24, borderBottomWidth: 1, borderBottomColor: COLORS.cloud },
-  avatarContainer: { position: 'relative', marginBottom: 16 },
-  avatar: { width: 100, height: 100, borderRadius: 50, backgroundColor: COLORS.porcelain, borderWidth: 2, borderColor: COLORS.cognac },
-  editBadge: { position: 'absolute', bottom: 0, right: 0, width: 32, height: 32, borderRadius: 16, backgroundColor: COLORS.cognac, justifyContent: 'center', alignItems: 'center', borderWidth: 2, borderColor: COLORS.white },
-  userName: { fontSize: 28, fontWeight: '300', color: COLORS.charcoal, marginBottom: 4, letterSpacing: 1 },
-  userUsername: { fontSize: 16, fontWeight: '400', color: COLORS.cognac, marginBottom: 8 },
-  userBio: { fontSize: 14, fontWeight: '400', color: COLORS.ash, textAlign: 'center', lineHeight: 20, marginBottom: 16, maxWidth: 300 },
-  editButton: { flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.porcelain, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, marginBottom: 20, borderWidth: 1, borderColor: COLORS.cloud },
-  editButtonText: { marginLeft: 6, fontSize: 14, fontWeight: '500', color: COLORS.cognac },
-  statsContainer: { flexDirection: 'row', justifyContent: 'space-around', width: '100%', maxWidth: 300, paddingTop: 16, borderTopWidth: 1, borderTopColor: COLORS.cloud },
-  statItem: { alignItems: 'center', paddingHorizontal: 20 },
-  statNumber: { fontSize: 20, fontWeight: '600', color: COLORS.charcoal, marginBottom: 4 },
-  statLabel: { fontSize: 12, fontWeight: '400', color: COLORS.ash, letterSpacing: 0.5 },
-  section: { padding: 20, borderBottomWidth: 1, borderBottomColor: COLORS.cloud },
-  sectionHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 },
-  sectionTitle: { fontSize: 18, fontWeight: '600', color: COLORS.charcoal, letterSpacing: 0.5 },
-  sectionSubtitle: { fontSize: 14, fontWeight: '400', color: COLORS.ash, marginTop: 4, letterSpacing: 0.5 },
-  seeAllText: { fontSize: 14, fontWeight: '500', color: COLORS.cognac },
-  recommendationsScroll: { marginHorizontal: -20, paddingHorizontal: 20 },
-  recommendationCard: { width: 150, height: 200, borderRadius: 12, marginRight: 12, overflow: 'hidden', position: 'relative' },
-  recommendationImage: { width: '100%', height: '100%' },
-  recommendationOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(0,0,0,0.5)', padding: 12 },
-  recommendationName: { fontSize: 16, fontWeight: '600', color: COLORS.white, marginBottom: 4 },
-  matchBadge: { backgroundColor: COLORS.cognac, paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, alignSelf: 'flex-start' },
-  matchText: { fontSize: 12, fontWeight: '600', color: COLORS.white },
-  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-  styleStat: { width: '48%', alignItems: 'center', backgroundColor: COLORS.white, padding: 20, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: COLORS.cloud },
-  statIconContainer: { width: 50, height: 50, borderRadius: 25, justifyContent: 'center', alignItems: 'center', marginBottom: 12 },
-  statValue: { fontSize: 24, fontWeight: '700', marginBottom: 6 },
-  statTitle: { fontSize: 14, fontWeight: '500', color: COLORS.charcoal, letterSpacing: 0.5 },
-  filterSection: { paddingHorizontal: 20, paddingVertical: 12, backgroundColor: COLORS.porcelain },
-  filterButton: { paddingHorizontal: 16, paddingVertical: 8, borderRadius: 20, backgroundColor: COLORS.white, marginRight: 10, borderWidth: 1, borderColor: COLORS.cloud },
-  filterButtonActive: { backgroundColor: COLORS.cognac, borderColor: COLORS.cognac },
-  filterText: { fontSize: 12, fontWeight: '500', color: COLORS.ash },
-  filterTextActive: { color: COLORS.white },
-  activityItem: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 16, borderBottomWidth: 1, borderBottomColor: COLORS.cloud },
-  activityLeft: { flexDirection: 'row', alignItems: 'center', flex: 1 },
-  activityIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 16 },
-  activityIconText: { fontSize: 20 },
-  activityInfo: { flex: 1 },
-  activityText: { fontSize: 15, fontWeight: '400', color: COLORS.charcoal, lineHeight: 20 },
-  activityAction: { color: COLORS.ash },
-  activityTarget: { color: COLORS.charcoal, fontWeight: '500' },
-  activityTime: { fontSize: 12, fontWeight: '400', color: COLORS.ash, marginTop: 4, letterSpacing: 0.3 },
-  emptyContainer: { alignItems: 'center', paddingVertical: 30 },
-  emptyText: { fontSize: 14, color: COLORS.ash, textAlign: 'center', fontStyle: 'italic', marginBottom: 15 },
-  emptyButton: { backgroundColor: COLORS.porcelain, paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8, borderWidth: 1, borderColor: COLORS.cloud },
-  emptyButtonText: { fontSize: 14, fontWeight: '500', color: COLORS.cognac },
-  quickActions: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', marginTop: 12 },
-  quickAction: { width: '48%', flexDirection: 'row', alignItems: 'center', backgroundColor: COLORS.white, padding: 16, borderRadius: 12, marginBottom: 12, borderWidth: 1, borderColor: COLORS.cloud },
-  quickIcon: { width: 40, height: 40, borderRadius: 20, justifyContent: 'center', alignItems: 'center', marginRight: 12 },
-  quickIconText: { fontSize: 20 },
-  quickText: { fontSize: 14, fontWeight: '500', color: COLORS.charcoal, letterSpacing: 0.3 },
-  logoutButton: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', backgroundColor: COLORS.white, padding: 16, marginHorizontal: 20, marginTop: 20, marginBottom: 30, borderRadius: 12, borderWidth: 1, borderColor: COLORS.error, gap: 8 },
-  logoutText: { fontSize: 16, fontWeight: '600', color: COLORS.error },
-  modalOverlay: { flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.5)' },
-  modalContent: { backgroundColor: COLORS.white, padding: 24, borderRadius: 12, width: width * 0.8, maxHeight: '80%' },
-  modalTitle: { fontSize: 20, fontWeight: '600', color: COLORS.charcoal, marginBottom: 20, textAlign: 'center' },
-  modalText: { fontSize: 16, color: COLORS.ash, textAlign: 'center', marginBottom: 20 },
-  modalCloseButton: { backgroundColor: COLORS.cognac, padding: 12, borderRadius: 8, alignItems: 'center', marginTop: 20 },
-  modalCloseText: { color: COLORS.white, fontWeight: '600', fontSize: 16 },
+  container: { 
+    flex: 1, 
+    backgroundColor: COLORS.white 
+  },
+  loadingContainer: { 
+    flex: 1, 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    gap: SIZES.md 
+  },
+  loadingText: { 
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.grayMedium 
+  },
+  scrollContent: { 
+    paddingBottom: SIZES.xxl 
+  },
+  
+  // Profil Bölümü
+  profileContainer: { 
+    position: 'relative', 
+    marginBottom: SIZES.xl 
+  },
+  coverImage: { 
+    width: width, 
+    height: 280, 
+    resizeMode: 'cover' 
+  },
+  profileOverlay: { 
+    position: 'absolute', 
+    top: 0, 
+    left: 0, 
+    right: 0, 
+    bottom: 0, 
+    backgroundColor: 'rgba(0,0,0,0.15)' 
+  },
+  profileHeader: { 
+    position: 'absolute', 
+    top: Platform.OS === 'ios' ? 50 : 20, 
+    left: 0, 
+    right: 0, 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: SIZES.md 
+  },
+  editCoverButton: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    backgroundColor: 'rgba(0,0,0,0.4)', 
+    paddingHorizontal: SIZES.md, 
+    paddingVertical: SIZES.sm, 
+    gap: SIZES.xs 
+  },
+  editCoverText: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.white 
+  },
+  settingsButton: { 
+    backgroundColor: 'rgba(0,0,0,0.4)', 
+    width: 40, 
+    height: 40, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  avatarContainer: { 
+    position: 'absolute', 
+    bottom: -60, 
+    left: SIZES.lg 
+  },
+  avatar: { 
+    width: 100, 
+    height: 100, 
+    borderRadius: 0, 
+    borderWidth: 2, 
+    borderColor: COLORS.white, 
+    backgroundColor: COLORS.surface 
+  },
+  editAvatarButton: { 
+    position: 'absolute', 
+    bottom: 0, 
+    right: 0, 
+    backgroundColor: COLORS.black, 
+    width: 28, 
+    height: 28, 
+    justifyContent: 'center', 
+    alignItems: 'center' 
+  },
+  
+  // Profil Bilgileri
+  profileInfo: { 
+    marginTop: 80, 
+    paddingHorizontal: SIZES.lg, 
+    marginBottom: SIZES.lg 
+  },
+  profileName: { 
+    ...TYPOGRAPHY.title2,
+    marginBottom: SIZES.xs 
+  },
+  titleText: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium,
+    marginBottom: SIZES.xs 
+  },
+  profileBio: { 
+    ...TYPOGRAPHY.body,
+    color: COLORS.grayDark,
+    lineHeight: 20 
+  },
+  
+  // İstatistik
+  statsContainer: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-around', 
+    paddingVertical: SIZES.md,
+    marginHorizontal: SIZES.lg,
+    marginBottom: SIZES.xl,
+    borderTopWidth: 0.5,
+    borderTopColor: COLORS.grayLight,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.grayLight,
+  },
+  statItem: { 
+    alignItems: 'center', 
+    paddingVertical: SIZES.sm 
+  },
+  statNumber: { 
+    ...TYPOGRAPHY.title3,
+    marginBottom: SIZES.xs 
+  },
+  statLabel: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium 
+  },
+  statDivider: { 
+    width: 0.5, 
+    backgroundColor: COLORS.grayLight 
+  },
+  
+  // Bilgi Kartı Stilleri
+  infoCard: {
+    marginHorizontal: SIZES.lg,
+    marginBottom: SIZES.md,
+    padding: SIZES.md,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    backgroundColor: COLORS.white,
+  },
+  infoCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.sm,
+    marginBottom: SIZES.sm,
+  },
+  infoCardTitle: {
+    ...TYPOGRAPHY.caption,
+    fontSize: 11,
+    letterSpacing: 1,
+  },
+  infoCardPreview: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.md,
+    marginTop: SIZES.xs,
+  },
+  previewText: {
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.grayMedium,
+  },
+  previewTag: {
+    paddingHorizontal: SIZES.sm,
+    paddingVertical: 2,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+  },
+  previewTagText: {
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+  },
+  
+  // Section Header
+  sectionHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingHorizontal: SIZES.lg, 
+    marginBottom: SIZES.md 
+  },
+  sectionTitle: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium 
+  },
+  sectionLink: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.black 
+  },
+  
+  // Aktif Tarz Kartı
+  activeStyleCard: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginHorizontal: SIZES.lg, 
+    marginBottom: SIZES.lg, 
+    paddingVertical: SIZES.md,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.grayLight,
+  },
+  activeStyleLeft: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: SIZES.md 
+  },
+  activeStyleIcon: { 
+    fontSize: 32 
+  },
+  activeStyleName: { 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500' 
+  },
+  activeStyleRank: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium 
+  },
+  activeStyleRight: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: SIZES.sm 
+  },
+  activeStylePercentage: { 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500' 
+  },
+  
+  // Identity Grid (Ana Ekran)
+  identityGrid: { 
+    flexDirection: 'row', 
+    flexWrap: 'wrap', 
+    paddingHorizontal: SIZES.lg, 
+    gap: SIZES.md, 
+    marginBottom: SIZES.xl 
+  },
+  identityCard: { 
+    width: (width - (SIZES.lg * 2 + SIZES.md)) / 2, 
+    backgroundColor: COLORS.surface, 
+    padding: SIZES.lg, 
+    alignItems: 'center',
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+  },
+  identityTitle: { 
+    ...TYPOGRAPHY.caption,
+    marginTop: SIZES.sm,
+    marginBottom: SIZES.xs 
+  },
+  identityCount: { 
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.grayMedium 
+  },
+  
+  // AI Kombin Öneri Butonu
+  aiSuggestionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginHorizontal: SIZES.lg,
+    marginTop: SIZES.md,
+    marginBottom: SIZES.lg,
+    padding: SIZES.md,
+    backgroundColor: COLORS.black,
+    gap: SIZES.md,
+  },
+  aiSuggestionText: {
+    flex: 1,
+  },
+  aiSuggestionTitle: {
+    ...TYPOGRAPHY.caption,
+    fontSize: 10,
+    letterSpacing: 1,
+    color: COLORS.white,
+  },
+  aiSuggestionSubtitle: {
+    ...TYPOGRAPHY.bodySmall,
+    fontSize: 9,
+    color: COLORS.grayMedium,
+    marginTop: 2,
+  },
+  
+  // Tüm Tarzlar
+  allStylesSection: { 
+    paddingHorizontal: SIZES.lg, 
+    marginTop: SIZES.md,
+    marginBottom: SIZES.xl,
+  },
+  allStylesTitle: { 
+    ...TYPOGRAPHY.caption,
+    marginBottom: SIZES.md 
+  },
+  miniStyleItem: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    paddingVertical: SIZES.md,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.grayLight,
+  },
+  miniStyleLeft: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    gap: SIZES.md 
+  },
+  miniStyleIcon: { 
+    fontSize: 24 
+  },
+  miniStyleName: { 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500' 
+  },
+  miniStyleRank: { 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium 
+  },
+  miniStylePercentage: { 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500' 
+  },
+
+  // ============================================================
+  // 📌 MODAL STILLERI
+  // ============================================================
+  modalOverlay: { 
+    flex: 1, 
+    backgroundColor: 'rgba(0,0,0,0.8)', 
+    justifyContent: 'flex-end' 
+  },
+  modalContent: { 
+    backgroundColor: COLORS.white, 
+    padding: SIZES.lg, 
+    width: width, 
+    maxHeight: height * 0.9 
+  },
+  modalHeader: { 
+    flexDirection: 'row', 
+    justifyContent: 'space-between', 
+    alignItems: 'center', 
+    marginBottom: SIZES.lg 
+  },
+  modalTitle: { 
+    ...TYPOGRAPHY.title3 
+  },
+  
+  // Form Stilleri
+  rowInput: { flexDirection: 'row', marginBottom: SIZES.md },
+  inputGroup: { marginBottom: SIZES.md },
+  inputLabel: { ...TYPOGRAPHY.bodySmall, marginBottom: SIZES.xs },
+  input: { 
+    ...TYPOGRAPHY.body, 
+    backgroundColor: COLORS.surface, 
+    paddingHorizontal: SIZES.md, 
+    paddingVertical: SIZES.sm,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+  },
+  bioInput: { minHeight: 80, textAlignVertical: 'top' },
+  saveButton: { 
+    backgroundColor: COLORS.black, 
+    paddingVertical: SIZES.md, 
+    alignItems: 'center', 
+    marginTop: SIZES.md 
+  },
+  saveButtonText: { ...TYPOGRAPHY.button, color: COLORS.white },
+  
+  // Premium Save Button
+  saveButtonPremium: {
+    flex: 1.5,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: COLORS.black,
+    paddingVertical: 14,
+    borderWidth: 0.5,
+    borderColor: COLORS.black,
+    elevation: 2,
+    shadowColor: COLORS.black,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
+    elevation: 0,
+    shadowOpacity: 0,
+  },
+  saveButtonTextPremium: {
+    ...TYPOGRAPHY.button,
+    fontSize: 12,
+    color: COLORS.white,
+    letterSpacing: 1.5,
+    fontWeight: '600',
+  },
+  
+  // Tarz Seçim Modal
+  styleModalContainer: { backgroundColor: COLORS.white, width: width, maxHeight: height * 0.8, padding: SIZES.lg },
+  styleModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SIZES.lg, paddingBottom: SIZES.md, borderBottomWidth: 0.5, borderBottomColor: COLORS.grayLight },
+  styleModalTitle: { ...TYPOGRAPHY.title3 },
+  styleModalList: { gap: SIZES.md },
+  styleModalItem: { flexDirection: 'row', alignItems: 'center', padding: SIZES.md, backgroundColor: COLORS.surface, gap: SIZES.md },
+  styleModalItemActive: { borderWidth: 0.5, borderColor: COLORS.black },
+  styleModalIcon: { fontSize: 24 },
+  styleModalInfo: { flex: 1 },
+  styleModalName: { ...TYPOGRAPHY.body, fontWeight: '500' },
+  styleModalNameActive: { fontWeight: '600' },
+  styleModalRankBadge: { marginTop: 2 },
+  styleModalRankText: { ...TYPOGRAPHY.caption },
+  styleModalPercentage: { marginRight: SIZES.sm },
+  styleModalPercentageText: { ...TYPOGRAPHY.body, fontWeight: '500' },
+  
+  // Ayarlar Menüsü
+  settingsMenuContainer: { backgroundColor: COLORS.white, width: width, maxHeight: height * 0.8 },
+  settingsMenuHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: SIZES.lg, borderBottomWidth: 0.5, borderBottomColor: COLORS.grayLight },
+  settingsMenuTitle: { ...TYPOGRAPHY.title3 },
+  settingsMenuSection: { marginBottom: SIZES.md, paddingHorizontal: SIZES.lg },
+  settingsMenuSectionTitle: { ...TYPOGRAPHY.caption, marginBottom: SIZES.sm },
+  settingsMenuItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SIZES.md },
+  settingsMenuItemLeft: { flexDirection: 'row', alignItems: 'center', gap: SIZES.md },
+  settingsMenuItemText: { ...TYPOGRAPHY.body },
+  settingsMenuItemValue: { ...TYPOGRAPHY.bodySmall, color: COLORS.grayMedium },
+  logoutMenuItem: { marginTop: SIZES.sm, borderTopWidth: 0.5, borderTopColor: COLORS.grayLight, paddingTop: SIZES.md },
+  logoutMenuText: { color: COLORS.error },
+  themeToggle: { paddingHorizontal: SIZES.md, paddingVertical: 2, borderWidth: 0.5, borderColor: COLORS.grayLight },
+  themeToggleActive: { backgroundColor: COLORS.black },
+  themeToggleText: { ...TYPOGRAPHY.caption },
+  themeToggleTextActive: { color: COLORS.white },
+  
+  // Beden ölçüleri grid stilleri
+  sizeOptionsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: SIZES.md,
+  },
+  sizeOption: {
+    width: 50,
+    paddingVertical: 10,
+    alignItems: 'center',
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+  },
+  sizeOptionActive: {
+    borderColor: COLORS.black,
+    backgroundColor: COLORS.black,
+  },
+  sizeOptionText: {
+    ...TYPOGRAPHY.body,
+    fontSize: 14,
+    color: COLORS.black,
+  },
+  sizeOptionTextActive: {
+    color: COLORS.white,
+  },
+  modalButtons: {
+    flexDirection: 'row',
+    gap: SIZES.md,
+    marginTop: SIZES.lg,
+    marginBottom: SIZES.lg,
+  },
+  cancelButton: {
+    flex: 1,
+    paddingVertical: SIZES.md,
+    alignItems: 'center',
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+  },
+  cancelButtonText: {
+    ...TYPOGRAPHY.caption,
+    fontSize: 12,
+  },
+  
+  // Tag container
+  tagContainer: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: SIZES.xs,
+    marginBottom: SIZES.sm,
+  },
+  tag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: SIZES.sm,
+    paddingVertical: 4,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+  },
+  tagText: {
+    ...TYPOGRAPHY.caption,
+    fontSize: 12,
+  },
+  addRow: {
+    flexDirection: 'row',
+    gap: SIZES.sm,
+    marginBottom: SIZES.md,
+  },
+  addInput: {
+    flex: 1,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    paddingHorizontal: SIZES.md,
+    paddingVertical: SIZES.sm,
+    ...TYPOGRAPHY.bodySmall,
+  },
+  addButton: {
+    paddingHorizontal: SIZES.md,
+    justifyContent: 'center',
+    borderWidth: 0.5,
+    borderColor: COLORS.black,
+  },
+  addButtonText: {
+    fontSize: 18,
+    color: COLORS.black,
+  },
 });
 
 export default StilimScreen;

@@ -1,3 +1,4 @@
+// 📁 src/screens/HashtagFeedScreen.js - LÜKS MİNİMALİST VERSİYON
 import React, { useState, useLayoutEffect, useCallback, useMemo } from 'react';
 import {
   View,
@@ -10,36 +11,16 @@ import {
   StatusBar,
   ScrollView,
   Dimensions,
-  Alert
+  Alert,
+  Platform
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { COLORS, TYPOGRAPHY, SIZES } from '../constants/Theme';
 
-// 📏 Ekran boyutları
 const { width: screenWidth } = Dimensions.get('window');
 
-// 🎨 Renk paleti (App.js ile uyumlu - cognac düzeltildi)
-const COLORS = {
-  white: '#FFFFFF',
-  ivory: '#F9F6F2',
-  paper: '#F5F3EF',
-  cloud: '#F0F0F0',
-  mist: '#E8E8E8',
-  ash: '#888888',
-  charcoal: '#222222',
-  noir: '#000000',
-  cognac: '#8C7853',  // ✅ DÜZELTİLDİ
-  porcelain: '#FAFAFA',
-  accent: '#8C7853',
-  success: '#4CAF50',
-  warning: '#FF9800',
-  error: '#F44336',
-  like: '#E91E63',
-  blue: '#0095f6',
-  green: '#00ff88',
-};
-
-// ✅ Mock veriler (inline - import hatasını önlemek için)
+// Mock veriler
 const mockPosts = [
   {
     id: '1',
@@ -126,16 +107,19 @@ const HashtagFeedScreen = () => {
   useLayoutEffect(() => {
     navigation.setOptions({
       headerTitle: `#${hashtag}`,
-      headerStyle: { backgroundColor: COLORS.noir },
-      headerTintColor: COLORS.white,
-      headerTitleStyle: { fontWeight: '700', fontSize: 18 },
+      headerStyle: { backgroundColor: COLORS.white },
+      headerTintColor: COLORS.black,
+      headerTitleStyle: { 
+        ...TYPOGRAPHY.caption,
+        letterSpacing: 1,
+      },
       headerLeft: () => (
         <TouchableOpacity 
           onPress={() => navigation.goBack()}
-          style={{ marginLeft: 16 }}
+          style={{ marginLeft: SIZES.md, padding: 4 }}
           hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
         >
-          <Ionicons name="chevron-back" size={24} color={COLORS.white} />
+          <Ionicons name="arrow-back" size={24} color={COLORS.black} />
         </TouchableOpacity>
       ),
     });
@@ -161,6 +145,13 @@ const HashtagFeedScreen = () => {
     navigation.push('HashtagFeed', { hashtag: tag });
   }, [navigation]);
 
+  const formatNumber = (num) => {
+    if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  };
+
   const renderPostItem = useCallback(({ item }) => {
     const isLiked = likedPosts.includes(item.id);
     const isSaved = savedPosts.includes(item.id);
@@ -173,7 +164,7 @@ const HashtagFeedScreen = () => {
             <View style={styles.userNameContainer}>
               <Text style={styles.userName}>{item.user?.name}</Text>
               {item.user?.verified && (
-                <Ionicons name="checkmark-circle" size={16} color={COLORS.blue} />
+                <Ionicons name="checkmark-circle" size={12} color={COLORS.black} />
               )}
             </View>
             <Text style={styles.timestamp}>{item.timestamp}</Text>
@@ -181,8 +172,9 @@ const HashtagFeedScreen = () => {
           <TouchableOpacity 
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
             onPress={() => Alert.alert('Seçenekler', 'Bu gönderi için işlemler')}
+            style={styles.moreButton}
           >
-            <Ionicons name="ellipsis-horizontal" size={20} color={COLORS.white} />
+            <Ionicons name="ellipsis-horizontal" size={18} color={COLORS.grayMedium} />
           </TouchableOpacity>
         </View>
 
@@ -201,17 +193,17 @@ const HashtagFeedScreen = () => {
               <Ionicons 
                 name={isLiked ? "heart" : "heart-outline"} 
                 size={18} 
-                color={isLiked ? COLORS.like : COLORS.white} 
+                color={isLiked ? COLORS.black : COLORS.grayMedium} 
               />
-              <Text style={styles.statText}>{item.likes + (isLiked ? 1 : 0)}</Text>
+              <Text style={styles.statText}>{formatNumber(item.likes + (isLiked ? 1 : 0))}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
               style={styles.stat}
               onPress={() => Alert.alert('Yorumlar', 'Yorumlar sayfası açılıyor...')}
             >
-              <Ionicons name="chatbubble-outline" size={18} color={COLORS.white} />
-              <Text style={styles.statText}>{item.comments}</Text>
+              <Ionicons name="chatbubble-outline" size={18} color={COLORS.grayMedium} />
+              <Text style={styles.statText}>{formatNumber(item.comments)}</Text>
             </TouchableOpacity>
             
             <TouchableOpacity 
@@ -221,15 +213,15 @@ const HashtagFeedScreen = () => {
               <Ionicons 
                 name={isSaved ? "bookmark" : "bookmark-outline"} 
                 size={18} 
-                color={isSaved ? COLORS.cognac : COLORS.white} 
+                color={isSaved ? COLORS.black : COLORS.grayMedium} 
               />
-              <Text style={styles.statText}>{item.saves + (isSaved ? 1 : 0)}</Text>
+              <Text style={styles.statText}>{formatNumber(item.saves + (isSaved ? 1 : 0))}</Text>
             </TouchableOpacity>
           </View>
           
           {item.location && (
             <View style={styles.location}>
-              <Ionicons name="location-outline" size={12} color={COLORS.ash} />
+              <Ionicons name="location-outline" size={10} color={COLORS.grayMedium} />
               <Text style={styles.locationText}>{item.location}</Text>
             </View>
           )}
@@ -237,7 +229,7 @@ const HashtagFeedScreen = () => {
 
         <View style={styles.captionContainer}>
           <Text style={styles.caption} numberOfLines={3}>
-            <Text style={styles.userName}>{item.user?.name} </Text>
+            <Text style={styles.captionUserName}>{item.user?.name} </Text>
             {item.caption}
           </Text>
         </View>
@@ -245,7 +237,7 @@ const HashtagFeedScreen = () => {
         <View style={styles.hashtagsContainer}>
           {item.hashtags?.map((tag, index) => (
             <TouchableOpacity key={index} onPress={() => goToHashtag(tag)}>
-              <Text style={styles.hashtagText}>#{tag} </Text>
+              <Text style={styles.hashtagText}>#{tag}</Text>
             </TouchableOpacity>
           ))}
         </View>
@@ -265,18 +257,18 @@ const HashtagFeedScreen = () => {
 
   return (
     <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="light-content" backgroundColor={COLORS.noir} />
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
       
       <View style={styles.hashtagHeader}>
         <View style={styles.hashtagInfo}>
           <Text style={styles.hashtagTitle}>#{hashtag}</Text>
           <View style={styles.hashtagStats}>
             <Text style={styles.postsCount}>
-              {trendData.posts.toLocaleString()} gönderi
+              {trendData.posts.toLocaleString()} GÖNDERİ
             </Text>
             {trendData.growth > 0 && (
               <View style={styles.growthBadge}>
-                <Ionicons name="trending-up" size={12} color={COLORS.green} />
+                <Ionicons name="trending-up" size={10} color={COLORS.grayMedium} />
                 <Text style={styles.growthText}>%{trendData.growth}</Text>
               </View>
             )}
@@ -286,22 +278,24 @@ const HashtagFeedScreen = () => {
 
       {trendData.relatedTags?.length > 0 && (
         <View style={styles.relatedTagsSection}>
-          <Text style={styles.relatedTagsTitle}>İlgili Trendler</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            <View style={styles.relatedTagsContainer}>
-              {trendData.relatedTags.map((tag, index) => (
-                <RelatedTag key={index} tag={tag} />
-              ))}
-            </View>
+          <Text style={styles.relatedTagsTitle}>İLGİLİ TRENDLER</Text>
+          <ScrollView 
+            horizontal 
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.relatedTagsContainer}
+          >
+            {trendData.relatedTags.map((tag, index) => (
+              <RelatedTag key={index} tag={tag} />
+            ))}
           </ScrollView>
         </View>
       )}
 
       <View style={styles.tabContainer}>
         {[
-          { id: 'top', label: '🔥 Trend' },
-          { id: 'recent', label: '⏳ Son' },
-          { id: 'media', label: '🎬 Medya' }
+          { id: 'top', label: 'TREND' },
+          { id: 'recent', label: 'SON' },
+          { id: 'media', label: 'MEDYA' }
         ].map((tab) => (
           <TouchableOpacity
             key={tab.id}
@@ -326,13 +320,18 @@ const HashtagFeedScreen = () => {
         contentContainerStyle={styles.feedContainer}
         ListEmptyComponent={
           <View style={styles.emptyContainer}>
-            <Ionicons name="search-outline" size={48} color={COLORS.ash} />
-            <Text style={styles.emptyText}>Bu hashtag'te henüz gönderi yok</Text>
+            <View style={styles.emptyIconContainer}>
+              <Ionicons name="hash-outline" size={40} color={COLORS.grayMedium} />
+            </View>
+            <Text style={styles.emptyTitle}>GÖNDERİ BULUNAMADI</Text>
+            <Text style={styles.emptyText}>
+              #{hashtag} etiketiyle henüz gönderi paylaşılmamış.
+            </Text>
             <TouchableOpacity 
               style={styles.emptyButton}
               onPress={() => navigation.goBack()}
             >
-              <Text style={styles.emptyButtonText}>Geri Dön</Text>
+              <Text style={styles.emptyButtonText}>GERİ DÖN</Text>
             </TouchableOpacity>
           </View>
         }
@@ -341,119 +340,124 @@ const HashtagFeedScreen = () => {
   );
 };
 
+// ============ STILLER ============
 const styles = StyleSheet.create({
   container: { 
     flex: 1, 
-    backgroundColor: COLORS.noir 
+    backgroundColor: COLORS.white 
   },
+  
+  // Hashtag Header
   hashtagHeader: { 
-    padding: 16, 
+    padding: SIZES.lg, 
     borderBottomWidth: 0.5, 
-    borderBottomColor: COLORS.charcoal 
+    borderBottomColor: COLORS.grayLight 
   },
   hashtagInfo: { 
     alignItems: 'center' 
   },
   hashtagTitle: { 
-    fontSize: 28, 
-    fontWeight: '700', 
-    color: COLORS.white, 
-    marginBottom: 8 
+    ...TYPOGRAPHY.title2,
+    marginBottom: SIZES.xs 
   },
   hashtagStats: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    gap: 12 
+    gap: SIZES.md 
   },
   postsCount: { 
-    fontSize: 16, 
-    color: COLORS.ash 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium 
   },
   growthBadge: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    backgroundColor: COLORS.charcoal, 
-    paddingHorizontal: 8, 
-    paddingVertical: 4, 
-    borderRadius: 8, 
-    gap: 4 
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    paddingHorizontal: SIZES.sm, 
+    paddingVertical: 2, 
+    gap: 2 
   },
   growthText: { 
-    fontSize: 12, 
-    color: COLORS.green, 
-    fontWeight: '600' 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium
   },
+  
+  // Related Tags
   relatedTagsSection: { 
-    padding: 16, 
+    padding: SIZES.md, 
     borderBottomWidth: 0.5, 
-    borderBottomColor: COLORS.charcoal 
+    borderBottomColor: COLORS.grayLight 
   },
   relatedTagsTitle: { 
-    fontSize: 16, 
-    fontWeight: '600', 
-    color: COLORS.white, 
-    marginBottom: 12 
+    ...TYPOGRAPHY.caption,
+    marginBottom: SIZES.md 
   },
   relatedTagsContainer: { 
     flexDirection: 'row', 
-    gap: 8 
+    gap: SIZES.sm,
+    paddingRight: SIZES.md,
   },
   relatedTag: { 
-    backgroundColor: COLORS.charcoal, 
-    paddingHorizontal: 16, 
-    paddingVertical: 8, 
-    borderRadius: 20, 
-    borderWidth: 1, 
-    borderColor: COLORS.ash 
+    borderWidth: 0.5, 
+    borderColor: COLORS.grayLight, 
+    paddingHorizontal: SIZES.md, 
+    paddingVertical: SIZES.sm, 
   },
   relatedTagText: { 
-    color: COLORS.white, 
-    fontWeight: '500' 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.black, 
   },
+  
+  // Tabs
   tabContainer: { 
     flexDirection: 'row', 
     borderBottomWidth: 0.5, 
-    borderBottomColor: COLORS.charcoal 
+    borderBottomColor: COLORS.grayLight 
   },
   tab: { 
     flex: 1, 
     alignItems: 'center', 
-    paddingVertical: 12 
+    paddingVertical: SIZES.md 
   },
   tabActive: { 
-    borderBottomWidth: 2, 
-    borderBottomColor: COLORS.white 
+    borderBottomWidth: 1, 
+    borderBottomColor: COLORS.black 
   },
   tabText: { 
-    color: COLORS.ash, 
-    fontWeight: '600' 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium, 
   },
   tabTextActive: { 
-    color: COLORS.white 
+    color: COLORS.black 
   },
+  
   feedContainer: { 
-    paddingBottom: 20 
+    paddingBottom: SIZES.xl 
   },
+  
+  // Post Card
   postCard: { 
-    backgroundColor: COLORS.charcoal, 
-    marginBottom: 12, 
-    borderBottomWidth: 0.5, 
-    borderBottomColor: COLORS.ash 
+    backgroundColor: COLORS.white, 
+    marginBottom: SIZES.md,
+    borderBottomWidth: 0.5,
+    borderBottomColor: COLORS.grayLight,
   },
   userInfo: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    padding: 12 
+    padding: SIZES.md 
   },
   avatar: { 
-    width: 32, 
-    height: 32, 
-    borderRadius: 16,
-    backgroundColor: COLORS.ash,
+    width: 40, 
+    height: 40, 
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    backgroundColor: COLORS.surface,
   },
   userDetails: { 
     flex: 1, 
-    marginLeft: 8 
+    marginLeft: SIZES.md 
   },
   userNameContainer: { 
     flexDirection: 'row', 
@@ -461,28 +465,33 @@ const styles = StyleSheet.create({
     gap: 4 
   },
   userName: { 
-    color: COLORS.white, 
-    fontWeight: '600' 
+    ...TYPOGRAPHY.body,
+    fontWeight: '500', 
   },
   timestamp: { 
-    color: COLORS.ash, 
-    fontSize: 12, 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium, 
     marginTop: 2 
+  },
+  moreButton: {
+    padding: 4,
   },
   postImage: { 
     width: '100%', 
     height: screenWidth, 
-    backgroundColor: COLORS.ash 
+    backgroundColor: COLORS.surface,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
   },
   engagement: { 
     flexDirection: 'row', 
     justifyContent: 'space-between', 
     alignItems: 'center', 
-    padding: 12 
+    padding: SIZES.md 
   },
   engagementStats: { 
     flexDirection: 'row', 
-    gap: 16 
+    gap: SIZES.lg 
   },
   stat: { 
     flexDirection: 'row', 
@@ -490,58 +499,77 @@ const styles = StyleSheet.create({
     gap: 4 
   },
   statText: { 
-    color: COLORS.white, 
-    fontSize: 12 
+    ...TYPOGRAPHY.caption,
   },
   location: { 
     flexDirection: 'row', 
     alignItems: 'center', 
-    gap: 4 
+    gap: 2 
   },
   locationText: { 
-    color: COLORS.ash, 
-    fontSize: 12 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium 
   },
   captionContainer: { 
-    paddingHorizontal: 12, 
-    paddingBottom: 8 
+    paddingHorizontal: SIZES.md, 
+    paddingBottom: SIZES.sm 
   },
   caption: { 
-    color: COLORS.white, 
-    fontSize: 14, 
-    lineHeight: 18 
+    ...TYPOGRAPHY.body,
+    lineHeight: 20,
+  },
+  captionUserName: {
+    ...TYPOGRAPHY.body,
+    fontWeight: '500',
   },
   hashtagsContainer: { 
-    paddingHorizontal: 12, 
-    paddingBottom: 12, 
+    paddingHorizontal: SIZES.md, 
+    paddingBottom: SIZES.md, 
     flexDirection: 'row', 
-    flexWrap: 'wrap' 
+    flexWrap: 'wrap',
+    gap: SIZES.sm,
   },
   hashtagText: { 
-    color: COLORS.blue, 
-    fontSize: 14 
+    ...TYPOGRAPHY.caption,
+    color: COLORS.grayMedium 
   },
+  
+  // Empty State
   emptyContainer: { 
     alignItems: 'center', 
-    padding: 40 
+    justifyContent: 'center',
+    padding: SIZES.xl,
+    minHeight: 400,
+  },
+  emptyIconContainer: {
+    width: 80,
+    height: 80,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SIZES.lg,
+  },
+  emptyTitle: {
+    ...TYPOGRAPHY.caption,
+    marginBottom: SIZES.sm,
   },
   emptyText: { 
-    color: COLORS.ash, 
-    fontSize: 16, 
-    marginTop: 12, 
+    ...TYPOGRAPHY.bodySmall,
+    color: COLORS.grayMedium, 
+    marginTop: SIZES.xs, 
     textAlign: 'center' 
   },
   emptyButton: {
-    marginTop: 20,
-    paddingHorizontal: 30,
-    paddingVertical: 12,
-    backgroundColor: COLORS.cognac,
-    borderRadius: 8,
+    marginTop: SIZES.lg,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    paddingHorizontal: SIZES.xl,
+    paddingVertical: SIZES.md,
   },
   emptyButtonText: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
+    ...TYPOGRAPHY.button,
+    color: COLORS.black,
   },
 });
 

@@ -1,38 +1,49 @@
-// 📁 src/screens/WashAssistantScreen.js - SADECE HATALAR DÜZELTİLDİ
+// 📁 src/screens/WashAssistantScreen.js - LÜKS MİNİMALİST VERSİYON
 import React, { useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Alert, Image, ScrollView, ActivityIndicator } from 'react-native';
+import { 
+  View, 
+  Text, 
+  StyleSheet, 
+  TouchableOpacity, 
+  Alert, 
+  Image, 
+  ScrollView, 
+  ActivityIndicator,
+  Platform,
+  Dimensions,
+  Animated,
+  SafeAreaView,
+  StatusBar
+} from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { Camera } from 'expo-camera';
 import * as ImageManipulator from 'expo-image-manipulator';
+import { COLORS, TYPOGRAPHY, SIZES } from '../constants/Theme';
 
-// 🎨 Renkler
-const COLORS = {
-  white: '#FFFFFF',
-  black: '#000000',
-  cognac: '#8C7853',  // ✅ DÜZELTİLDİ
-  error: '#F44336',
-  success: '#4CAF50',
-  warning: '#FF9800',
-  gray: '#888888',
-  darkGray: '#222222',
-  lightGray: '#333333',
-};
+const { width, height } = Dimensions.get('window');
 
-// ✅ Mock classifier (AI dosyası yoksa çalışsın)
+// Mock classifier
 const fabricClassifier = {
   classifyFabric: async (imageUri) => {
-    console.log('🤖 Mock AI analiz yapılıyor:', imageUri);
+    console.log('🤖 AI analiz yapılıyor:', imageUri);
     await new Promise(resolve => setTimeout(resolve, 1500));
-    const fabrics = ['pamuk', 'polyester', 'yün', 'ipek', 'keten', 'viskon'];
+    const fabrics = [
+      { name: 'pamuk', icon: '🌿', temp: 40, program: 'Pamuklu', care: 'Makinede yıkanabilir, ters çevirerek yıkayın' },
+      { name: 'polyester', icon: '🧵', temp: 30, program: 'Sentetik', care: 'Düşük sıcaklıkta yıkayın, kuru temizleme yaptırmayın' },
+      { name: 'yün', icon: '🐑', temp: 30, program: 'Yünlü', care: 'Elde yıkayın veya kuru temizleme' },
+      { name: 'ipek', icon: '🦋', temp: 30, program: 'İpekli', care: 'Sadece kuru temizleme veya elde soğuk suda' },
+      { name: 'keten', icon: '🌾', temp: 40, program: 'Keten', care: 'Ütü yaparken nemliyken ütüleyin' },
+      { name: 'viskon', icon: '👗', temp: 30, program: 'Hassas', care: 'Ters çevirerek yıkayın, sıkmayın' }
+    ];
     const randomFabric = fabrics[Math.floor(Math.random() * fabrics.length)];
-    const icons = { pamuk: '👕', polyester: '🧥', yün: '🧣', ipek: '👘', keten: '👚', viskon: '👗' };
     
     return {
-      fabric: randomFabric,
+      fabric: randomFabric.name,
       confidence: 0.7 + Math.random() * 0.25,
-      icon: icons[randomFabric] || '👕',
-      temperature: randomFabric === 'yün' ? 30 : randomFabric === 'ipek' ? 30 : 40,
-      program: randomFabric === 'pamuk' ? 'Pamuklu' : 'Hassas',
-      care: randomFabric === 'yün' ? 'Sadece kuru temizleme' : 'Makinede yıkanabilir'
+      icon: randomFabric.icon,
+      temperature: randomFabric.temp,
+      program: randomFabric.program,
+      care: randomFabric.care
     };
   }
 };
@@ -45,6 +56,7 @@ const WashAssistantScreen = () => {
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisResult, setAnalysisResult] = useState(null);
   const cameraRef = useRef(null);
+  const fadeAnim = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     (async () => {
@@ -55,31 +67,28 @@ const WashAssistantScreen = () => {
 
   const requestCameraPermission = async () => {
     try {
-      console.log('📷 Kamera izni isteniyor...');
       const { status } = await Camera.requestCameraPermissionsAsync();
       setHasPermission(status === 'granted');
       
       if (status === 'granted') {
         setCameraVisible(true);
-        console.log('✅ Kamera izni verildi');
       } else {
         Alert.alert(
-          '📸 İzin Reddedildi', 
-          'Kamera izni gerekli. Test fotoğrafı kullanabilirsiniz.',
+          'Kamera İzni Gerekli', 
+          'Kumaş analizi için kamera iznine ihtiyaç var. Örnek fotoğraf kullanabilirsiniz.',
           [
             { text: 'İptal', style: 'cancel' },
-            { text: 'Test Fotoğrafı', onPress: useMockImage }
+            { text: 'Örnek Fotoğraf', onPress: useMockImage }
           ]
         );
       }
     } catch (error) {
-      console.log('❌ Kamera hatası:', error);
       Alert.alert(
         'Kamera Hatası', 
-        'Kamera açılamadı. Test fotoğrafı kullanın.',
+        'Kamera açılamadı. Örnek fotoğraf kullanın.',
         [
           { text: 'İptal', style: 'cancel' },
-          { text: 'Test Fotoğrafı', onPress: useMockImage }
+          { text: 'Örnek Fotoğraf', onPress: useMockImage }
         ]
       );
     }
@@ -92,36 +101,25 @@ const WashAssistantScreen = () => {
     }
 
     try {
-      console.log('📸 Fotoğraf çekiliyor...');
-      
       const photo = await cameraRef.current.takePictureAsync({
         quality: 0.8,
         base64: false,
         exif: false
       });
-      
-      console.log('✅ Fotoğraf çekildi:', photo.uri);
-
-      if (!photo.uri) {
-        throw new Error('Fotoğraf URI alınamadı');
-      }
 
       const manipulatedImage = await ImageManipulator.manipulateAsync(
         photo.uri,
-        [{ resize: { width: 400, height: 400 } }],
+        [{ resize: { width: 500, height: 500 } }],
         { compress: 0.7, format: ImageManipulator.SaveFormat.JPEG }
       );
 
-      console.log('🖼️ İşlenen fotoğraf:', manipulatedImage.uri);
       setCapturedImage(manipulatedImage.uri);
       setCameraVisible(false);
       setAnalysisResult(null);
       
-      Alert.alert('✅ Başarılı!', 'Fotoğraf çekildi. Şimdi AI ile analiz edebilirsiniz.');
-
+      Alert.alert('Fotoğraf Çekildi', 'Şimdi AI ile analiz edebilirsiniz.');
     } catch (error) {
-      console.log('❌ Fotoğraf hatası:', error);
-      Alert.alert('Hata', `Fotoğraf çekilemedi: ${error.message}`);
+      Alert.alert('Hata', 'Fotoğraf çekilemedi');
     }
   };
 
@@ -141,42 +139,36 @@ const WashAssistantScreen = () => {
     ];
     
     const randomImage = mockImages[Math.floor(Math.random() * mockImages.length)];
-    console.log('🖼️ Mock fotoğraf kullanılıyor:', randomImage);
     setCapturedImage(randomImage);
     setAnalysisResult(null);
-    Alert.alert('📸 Test Modu', 'Demo için örnek fotoğraf kullanılıyor.');
   };
 
   const analyzeFabric = async () => {
     if (!capturedImage) {
-      Alert.alert('Hata', 'Önce kumaş fotoğrafı seçin!');
+      Alert.alert('Uyarı', 'Önce bir fotoğraf seçin!');
       return;
     }
 
-    console.log('🤖 AI analiz başlatılıyor:', capturedImage);
     setIsAnalyzing(true);
+    Animated.sequence([
+      Animated.timing(fadeAnim, { toValue: 0.5, duration: 300, useNativeDriver: true }),
+      Animated.timing(fadeAnim, { toValue: 1, duration: 300, useNativeDriver: true })
+    ]).start();
 
     try {
       const result = await fabricClassifier.classifyFabric(capturedImage);
-      console.log('🎯 AI Sonuç:', result);
       setAnalysisResult(result);
     } catch (error) {
-      console.log('❌ AI analiz hatası:', error);
-      
       const mockResult = {
         fabric: 'pamuk',
         confidence: 0.85,
-        icon: '👕',
+        icon: '🌿',
         temperature: 40,
         program: 'Pamuklu',
-        care: 'Makinede yıkanabilir, ters çevirerek yıkayın'
+        care: 'Makinede yıkanabilir, ters çevirerek yıkayın.'
       };
-      
       setAnalysisResult(mockResult);
-      Alert.alert(
-        '⚠️ AI Servisi Hatası',
-        'Demo modunda çalışıyor. Örnek sonuç gösteriliyor.'
-      );
+      Alert.alert('Demo Modu', 'Örnek sonuç gösteriliyor.');
     } finally {
       setIsAnalyzing(false);
     }
@@ -186,23 +178,23 @@ const WashAssistantScreen = () => {
     if (!analysisResult) return null;
 
     const confidencePercent = Math.round(analysisResult.confidence * 100);
-    const confidenceColor = confidencePercent > 80 ? COLORS.success : confidencePercent > 60 ? COLORS.warning : COLORS.error;
+    const confidenceColor = confidencePercent > 80 ? COLORS.black : confidencePercent > 60 ? COLORS.grayMedium : COLORS.grayLight;
 
     return (
-      <View style={styles.resultContainer}>
+      <Animated.View style={[styles.resultContainer, { opacity: fadeAnim }]}>
         <View style={styles.resultHeader}>
-          <Text style={styles.resultIcon}>{analysisResult.icon || '👕'}</Text>
+          <Text style={styles.resultIcon}>{analysisResult.icon}</Text>
           <Text style={styles.resultTitle}>ANALİZ SONUCU</Text>
         </View>
         
         <View style={styles.resultCard}>
           <View style={styles.resultRow}>
-            <Text style={styles.resultLabel}>Kumaş Türü:</Text>
+            <Text style={styles.resultLabel}>KUMAŞ TÜRÜ</Text>
             <Text style={styles.resultValue}>{analysisResult.fabric.toUpperCase()}</Text>
           </View>
           
           <View style={styles.resultRow}>
-            <Text style={styles.resultLabel}>Güven Seviyesi:</Text>
+            <Text style={styles.resultLabel}>GÜVEN SEVİYESİ</Text>
             <View style={styles.confidenceContainer}>
               <View style={[styles.confidenceBar, { width: `${confidencePercent}%`, backgroundColor: confidenceColor }]} />
               <Text style={styles.confidenceText}>%{confidencePercent}</Text>
@@ -210,188 +202,239 @@ const WashAssistantScreen = () => {
           </View>
           
           <View style={styles.resultRow}>
-            <Text style={styles.resultLabel}>Önerilen Sıcaklık:</Text>
-            <Text style={styles.resultValue}>{analysisResult.temperature || 30}°C</Text>
+            <Text style={styles.resultLabel}>ÖNERİLEN SICAKLIK</Text>
+            <Text style={styles.resultValue}>{analysisResult.temperature}°C</Text>
           </View>
           
           <View style={styles.resultRow}>
-            <Text style={styles.resultLabel}>Yıkama Programı:</Text>
-            <Text style={styles.resultValue}>{analysisResult.program || 'Hassas'}</Text>
+            <Text style={styles.resultLabel}>YIKAMA PROGRAMI</Text>
+            <Text style={styles.resultValue}>{analysisResult.program}</Text>
           </View>
           
           <View style={styles.careContainer}>
-            <Text style={styles.careText}>💡 {analysisResult.care || 'Soğuk suda ters yüz ederek yıkayın.'}</Text>
+            <Ionicons name="bulb-outline" size={14} color={COLORS.black} />
+            <Text style={styles.careText}>{analysisResult.care}</Text>
           </View>
         </View>
-      </View>
+      </Animated.View>
     );
   };
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.title}>🧼 YIKAMA ASİSTANTI</Text>
-      <Text style={styles.subtitle}>Kumaşını tanı, doğru yıka</Text>
+    <SafeAreaView style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
       
-      {!cameraVisible && !capturedImage && (
-        <View style={styles.initialView}>
-          <Text style={styles.description}>
-            AI ile kumaş türünü tanıyıp, en uygun yıkama talimatlarını veriyoruz.
-          </Text>
-          
-          <TouchableOpacity style={styles.cameraButton} onPress={requestCameraPermission}>
-            <Text style={styles.cameraButtonText}>📷 FOTOĞRAF ÇEK</Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity style={styles.galleryButton} onPress={useMockImage}>
-            <Text style={styles.galleryButtonText}>🖼️ ÖRNEK FOTOĞRAF KULLAN</Text>
-          </TouchableOpacity>
+      <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+        {/* Header */}
+        <View style={styles.header}>
+          <Text style={styles.headerTitle}>YIKAMA ASİSTANI</Text>
+          <View style={styles.headerIcon}>
+            <Ionicons name="water-outline" size={20} color={COLORS.black} />
+          </View>
         </View>
-      )}
-
-      {cameraVisible && hasPermission && (
-        <View style={styles.cameraContainer}>
-          <Camera 
-            style={styles.camera} 
-            ref={cameraRef}
-            type={cameraType}
-            ratio="1:1"
-          >
-            <View style={styles.cameraOverlay}>
-              <View style={styles.cameraFrame} />
+        
+        <Text style={styles.subtitle}>KUMAŞINI TANI, DOĞRU YIKA</Text>
+        
+        {!cameraVisible && !capturedImage && (
+          <View style={styles.initialView}>
+            <View style={styles.illustrationContainer}>
+              <Ionicons name="shirt-outline" size={64} color={COLORS.grayMedium} />
+              <View style={styles.waterDrops}>
+                <Ionicons name="water" size={18} color={COLORS.black} />
+                <Ionicons name="water" size={24} color={COLORS.black} />
+                <Ionicons name="water" size={14} color={COLORS.black} />
+              </View>
             </View>
             
-            <View style={styles.cameraControls}>
-              <TouchableOpacity style={styles.closeButton} onPress={() => setCameraVisible(false)}>
-                <Text style={styles.closeButtonText}>✕</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
-                <View style={styles.captureButtonInner} />
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.switchButton} onPress={switchCamera}>
-                <Text style={styles.switchButtonText}>🔄</Text>
-              </TouchableOpacity>
-            </View>
-          </Camera>
-        </View>
-      )}
-
-      {capturedImage && (
-        <View style={styles.previewContainer}>
-          <Text style={styles.previewTitle}>📸 SEÇİLEN FOTOĞRAF</Text>
-          
-          <Image 
-            source={{ uri: capturedImage }} 
-            style={styles.previewImage} 
-            onError={() => {
-              Alert.alert('Hata', 'Fotoğraf yüklenemedi');
-              setCapturedImage(null);
-            }}
-          />
-          
-          <View style={styles.previewActions}>
-            <TouchableOpacity 
-              style={[styles.analyzeButton, isAnalyzing && styles.disabledButton]}
-              onPress={analyzeFabric}
-              disabled={isAnalyzing}
-            >
-              {isAnalyzing ? (
-                <View style={styles.loadingContainer}>
-                  <ActivityIndicator size="small" color={COLORS.white} />
-                  <Text style={styles.analyzeButtonText}> ANALİZ EDİLİYOR...</Text>
-                </View>
-              ) : (
-                <Text style={styles.analyzeButtonText}>🤖 AI İLE ANALİZ ET</Text>
-              )}
+            <Text style={styles.description}>
+              AI ile kumaş türünü tanıyıp, en uygun yıkama talimatlarını alın.
+            </Text>
+            
+            <TouchableOpacity style={styles.cameraButton} onPress={requestCameraPermission}>
+              <Ionicons name="camera-outline" size={16} color={COLORS.white} />
+              <Text style={styles.cameraButtonText}>FOTOĞRAF ÇEK</Text>
             </TouchableOpacity>
-            
-            <TouchableOpacity style={styles.retakeButton} onPress={() => {
-              setCapturedImage(null);
-              setAnalysisResult(null);
-            }}>
-              <Text style={styles.retakeButtonText}>🔄 YENİ FOTOĞRAF SEÇ</Text>
+
+            <TouchableOpacity style={styles.galleryButton} onPress={useMockImage}>
+              <Ionicons name="images-outline" size={16} color={COLORS.black} />
+              <Text style={styles.galleryButtonText}>ÖRNEK FOTOĞRAF KULLAN</Text>
             </TouchableOpacity>
           </View>
+        )}
 
-          {renderResult()}
-        </View>
-      )}
-    </ScrollView>
+        {cameraVisible && hasPermission && (
+          <View style={styles.cameraContainer}>
+            <Camera 
+              style={styles.camera} 
+              ref={cameraRef}
+              type={cameraType}
+              ratio="1:1"
+            >
+              <View style={styles.cameraOverlay}>
+                <View style={styles.cameraFrame} />
+              </View>
+              
+              <View style={styles.cameraControls}>
+                <TouchableOpacity style={styles.closeButton} onPress={() => setCameraVisible(false)}>
+                  <Ionicons name="close" size={20} color={COLORS.white} />
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.captureButton} onPress={takePicture}>
+                  <View style={styles.captureButtonInner} />
+                </TouchableOpacity>
+                
+                <TouchableOpacity style={styles.switchButton} onPress={switchCamera}>
+                  <Ionicons name="camera-reverse-outline" size={20} color={COLORS.white} />
+                </TouchableOpacity>
+              </View>
+            </Camera>
+          </View>
+        )}
+
+        {capturedImage && (
+          <View style={styles.previewContainer}>
+            <View style={styles.previewHeader}>
+              <Text style={styles.previewTitle}>SEÇİLEN FOTOĞRAF</Text>
+              <TouchableOpacity onPress={() => {
+                setCapturedImage(null);
+                setAnalysisResult(null);
+              }}>
+                <Ionicons name="refresh-outline" size={18} color={COLORS.grayMedium} />
+              </TouchableOpacity>
+            </View>
+            
+            <Image 
+              source={{ uri: capturedImage }} 
+              style={styles.previewImage} 
+            />
+            
+            <View style={styles.previewActions}>
+              <TouchableOpacity 
+                style={[styles.analyzeButton, isAnalyzing && styles.disabledButton]}
+                onPress={analyzeFabric}
+                disabled={isAnalyzing}
+              >
+                {isAnalyzing ? (
+                  <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="small" color={COLORS.white} />
+                    <Text style={styles.analyzeButtonText}> ANALİZ EDİLİYOR...</Text>
+                  </View>
+                ) : (
+                  <>
+                    <Ionicons name="sparkles-outline" size={16} color={COLORS.white} />
+                    <Text style={styles.analyzeButtonText}>AI İLE ANALİZ ET</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+
+            {renderResult()}
+          </View>
+        )}
+      </ScrollView>
+    </SafeAreaView>
   );
 };
 
+// ============ STILLER ============
 const styles = StyleSheet.create({
-  container: { 
-    flexGrow: 1, 
-    backgroundColor: COLORS.black,
-    paddingBottom: 40
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.white,
   },
-  title: { 
-    color: COLORS.white,
-    fontSize: 28, 
-    fontWeight: '200',
-    letterSpacing: 2,
-    textAlign: 'center', 
-    marginTop: 60,
-    marginBottom: 10
+  scrollContent: {
+    paddingBottom: SIZES.xl,
   },
+  
+  header: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.lg,
+    paddingTop: Platform.OS === 'ios' ? 12 : SIZES.md,
+    paddingBottom: SIZES.xs,
+  },
+  headerTitle: {
+    ...TYPOGRAPHY.caption,
+    letterSpacing: 1.5,
+  },
+  headerIcon: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'flex-end',
+  },
+  
   subtitle: {
-    color: COLORS.gray,
-    fontSize: 14,
+    ...TYPOGRAPHY.caption,
+    fontSize: 10,
+    color: COLORS.grayMedium,
     textAlign: 'center',
-    marginBottom: 40,
-    letterSpacing: 1
+    marginBottom: SIZES.xl,
   },
+  
   initialView: {
-    padding: 30,
-    alignItems: 'center'
+    paddingHorizontal: SIZES.xl,
+    alignItems: 'center',
+  },
+  illustrationContainer: {
+    position: 'relative',
+    alignItems: 'center',
+    marginBottom: SIZES.xl,
+  },
+  waterDrops: {
+    position: 'absolute',
+    bottom: -10,
+    right: 20,
+    flexDirection: 'row',
+    gap: 2,
   },
   description: {
-    color: COLORS.gray,
-    fontSize: 15,
+    ...TYPOGRAPHY.bodySmall,
     textAlign: 'center',
-    marginBottom: 50,
-    lineHeight: 24,
-    paddingHorizontal: 20
+    lineHeight: 20,
+    marginBottom: SIZES.xl,
   },
-  cameraButton: { 
-    backgroundColor: '#007AFF', 
-    padding: 18, 
-    borderRadius: 12, 
-    alignItems: 'center', 
-    marginBottom: 15,
-    width: '100%'
-  },
-  cameraButtonText: { 
-    color: COLORS.white, 
-    fontSize: 16, 
-    fontWeight: '600',
-    letterSpacing: 1
-  },
-  galleryButton: { 
-    backgroundColor: '#5856D6', 
-    padding: 18, 
-    borderRadius: 12, 
+  
+  cameraButton: {
+    flexDirection: 'row',
     alignItems: 'center',
-    width: '100%'
-  },
-  galleryButtonText: { 
-    color: COLORS.white, 
-    fontSize: 16, 
-    fontWeight: '600',
-    letterSpacing: 1
-  },
-  cameraContainer: { 
-    height: 500,
+    justifyContent: 'center',
+    gap: SIZES.sm,
+    backgroundColor: COLORS.black,
+    paddingVertical: SIZES.md,
     width: '100%',
-    overflow: 'hidden',
-    borderRadius: 20,
-    marginTop: 20
+    marginBottom: SIZES.md,
   },
-  camera: { 
+  cameraButtonText: {
+    ...TYPOGRAPHY.button,
+    color: COLORS.white,
+  },
+  galleryButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SIZES.sm,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    paddingVertical: SIZES.md,
+    width: '100%',
+  },
+  galleryButtonText: {
+    ...TYPOGRAPHY.button,
+    color: COLORS.black,
+  },
+  
+  cameraContainer: {
+    height: height * 0.55,
+    marginHorizontal: SIZES.lg,
+    marginTop: SIZES.md,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    overflow: 'hidden',
+  },
+  camera: {
     flex: 1,
-    position: 'relative'
   },
   cameraOverlay: {
     position: 'absolute',
@@ -400,197 +443,178 @@ const styles = StyleSheet.create({
     right: 0,
     bottom: 0,
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   cameraFrame: {
-    width: 250,
-    height: 250,
-    borderWidth: 2,
+    width: 200,
+    height: 200,
+    borderWidth: 1,
     borderColor: COLORS.white,
-    borderRadius: 12,
-    backgroundColor: 'transparent'
+    backgroundColor: 'transparent',
   },
   cameraControls: {
     position: 'absolute',
-    bottom: 30,
+    bottom: SIZES.xl,
     left: 0,
     right: 0,
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    paddingHorizontal: 20
+    paddingHorizontal: SIZES.lg,
   },
   captureButton: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: 'rgba(255,255,255,0.3)',
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-  captureButtonInner: {
     width: 60,
     height: 60,
-    borderRadius: 30,
-    backgroundColor: COLORS.white
+    borderWidth: 2,
+    borderColor: COLORS.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  captureButtonInner: {
+    width: 50,
+    height: 50,
+    backgroundColor: COLORS.white,
   },
   switchButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 40,
+    height: 40,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    alignItems: 'center'
-  },
-  switchButtonText: {
-    fontSize: 24,
-    color: COLORS.white
+    alignItems: 'center',
   },
   closeButton: {
-    width: 50,
-    height: 50,
-    borderRadius: 25,
-    backgroundColor: 'rgba(255,0,0,0.5)',
+    width: 40,
+    height: 40,
+    backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
   },
-  closeButtonText: {
-    fontSize: 24,
-    color: COLORS.white,
-    fontWeight: 'bold'
-  },
+  
   previewContainer: {
-    padding: 20,
-    alignItems: 'center'
+    padding: SIZES.lg,
+    alignItems: 'center',
+  },
+  previewHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    width: '100%',
+    marginBottom: SIZES.md,
   },
   previewTitle: {
-    color: COLORS.white,
-    fontSize: 14,
-    fontWeight: '600',
-    marginBottom: 20,
-    letterSpacing: 1
+    ...TYPOGRAPHY.caption,
+    fontSize: 10,
+    color: COLORS.grayMedium,
   },
-  previewImage: { 
-    width: 250, 
-    height: 250, 
-    borderRadius: 12, 
-    marginBottom: 30,
-    backgroundColor: COLORS.lightGray
+  previewImage: {
+    width: 200,
+    height: 200,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    marginBottom: SIZES.lg,
+    backgroundColor: COLORS.surface,
   },
   previewActions: {
     width: '100%',
-    alignItems: 'center'
+    alignItems: 'center',
   },
-  analyzeButton: { 
-    backgroundColor: COLORS.success, 
-    padding: 16, 
-    borderRadius: 10, 
-    marginBottom: 12,
-    width: '100%'
+  analyzeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: SIZES.sm,
+    backgroundColor: COLORS.black,
+    paddingVertical: SIZES.md,
+    width: '100%',
   },
   disabledButton: {
-    backgroundColor: '#666',
-    opacity: 0.7
+    opacity: 0.7,
   },
-  analyzeButtonText: { 
-    color: COLORS.white, 
-    fontSize: 16, 
-    fontWeight: '600',
-    textAlign: 'center'
+  analyzeButtonText: {
+    ...TYPOGRAPHY.button,
+    color: COLORS.white,
   },
   loadingContainer: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center'
+    alignItems: 'center',
+    gap: SIZES.xs,
   },
-  retakeButton: { 
-    backgroundColor: COLORS.warning, 
-    padding: 16, 
-    borderRadius: 10,
-    width: '100%'
-  },
-  retakeButtonText: { 
-    color: COLORS.white, 
-    fontSize: 16,
-    textAlign: 'center',
-    fontWeight: '600'
-  },
+  
   resultContainer: {
     width: '100%',
-    marginTop: 30,
-    backgroundColor: COLORS.darkGray,
-    borderRadius: 16,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: COLORS.lightGray
+    marginTop: SIZES.lg,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
+    padding: SIZES.lg,
   },
   resultHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: 20
+    marginBottom: SIZES.md,
+    gap: SIZES.sm,
   },
   resultIcon: {
-    fontSize: 30,
-    marginRight: 10
+    fontSize: 28,
   },
   resultTitle: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 1
+    ...TYPOGRAPHY.caption,
+    fontSize: 11,
   },
   resultCard: {
-    gap: 15
+    gap: SIZES.md,
   },
   resultRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'center'
+    alignItems: 'center',
   },
   resultLabel: {
-    color: COLORS.gray,
-    fontSize: 14
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    color: COLORS.grayMedium,
   },
   resultValue: {
-    color: COLORS.white,
-    fontSize: 16,
-    fontWeight: '600'
+    ...TYPOGRAPHY.bodySmall,
+    fontWeight: '500',
   },
   confidenceContainer: {
-    flex: 1,
+    flex: 0.6,
     height: 24,
-    backgroundColor: COLORS.lightGray,
-    borderRadius: 12,
-    marginLeft: 10,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
     position: 'relative',
-    overflow: 'hidden'
+    overflow: 'hidden',
   },
   confidenceBar: {
     position: 'absolute',
     top: 0,
     left: 0,
     bottom: 0,
-    width: '0%'
   },
   confidenceText: {
     position: 'absolute',
-    top: 2,
+    top: 4,
     right: 8,
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    fontWeight: 'bold',
     color: COLORS.white,
-    fontSize: 12,
-    fontWeight: 'bold'
   },
   careContainer: {
-    marginTop: 10,
-    padding: 15,
-    backgroundColor: COLORS.black,
-    borderRadius: 10
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: SIZES.sm,
+    marginTop: SIZES.sm,
+    padding: SIZES.md,
+    borderWidth: 0.5,
+    borderColor: COLORS.grayLight,
   },
   careText: {
-    color: COLORS.success,
-    fontSize: 14,
-    lineHeight: 20
-  }
+    flex: 1,
+    ...TYPOGRAPHY.caption,
+    fontSize: 9,
+    lineHeight: 16,
+  },
 });
 
 export default WashAssistantScreen;
