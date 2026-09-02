@@ -19,7 +19,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { loadLocalData, migrateDataToFirestore } from './src/services/firestoreService';
 
 // 🆕 API Servis (BACKEND BAĞLANTISI)
-import { API_URL, api } from './src/services/api';
+import { API_URL } from './src/services/api';  // ✅ api kaldırıldı
 
 // ============================================================
 // 📌 ANA SAYFALAR (TAB'ler)
@@ -144,7 +144,7 @@ function PodiumStack() {
   const isDark = theme === 'dark';
   
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false }}>      
       <Stack.Screen name="PodiumMain" component={PodiumScreen} />
       <Stack.Screen name="HashtagFeed" component={HashtagFeedScreen} />
       <Stack.Screen 
