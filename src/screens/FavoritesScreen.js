@@ -1,4 +1,5 @@
-// 📁 src/screens/FavoritesScreen.js - TAM REVİZE (Backend Entegre)
+// 📁 src/screens/FavoritesScreen.js - REVİZE (Premium Kart Eklendi)
+
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   View, 
@@ -20,6 +21,11 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, TYPOGRAPHY, SIZES } from '../constants/Theme';
 import { auth } from '../config/firebase';
 import { wardrobeAPI } from '../services/api';
+
+// ============================================================
+// 📌 TOAST İMPORTU
+// ============================================================
+import { showToast } from '../components/CustomAlert';
 
 const { width, height } = Dimensions.get('window');
 
@@ -54,11 +60,9 @@ const useRealFavorites = () => {
         return;
       }
 
-      // Backend'den gardırop verilerini çek
       const response = await wardrobeAPI.getAllItems(uid);
       
       if (response && response.success) {
-        // Tüm kategorilerden ürünleri topla
         const allItems = [];
         if (response.categories) {
           Object.values(response.categories).forEach(categoryItems => {
@@ -68,7 +72,6 @@ const useRealFavorites = () => {
           });
         }
         
-        // Star (favori) olanları filtrele
         const starItems = allItems.filter(item => item.is_star === true);
         const starIds = starItems.map(item => item.product_id || item.id);
         
@@ -91,14 +94,19 @@ const useRealFavorites = () => {
     try {
       const uid = user?.uid;
       if (!uid) {
-        Alert.alert('Giriş Yapın', 'Favori işlemi için lütfen giriş yapın.');
+        showToast({
+          title: 'Giriş Yapın',
+          message: 'Favori işlemi için lütfen giriş yapın.',
+          type: 'warning',
+          autoClose: true,
+          autoCloseDelay: 2500,
+        });
         return null;
       }
 
       const isCurrentlyFavorite = favoriteIds.includes(productId || itemId);
       const newStatus = !isCurrentlyFavorite;
       
-      // Backend'de güncelle
       const response = await wardrobeAPI.toggleStar(
         uid,
         productId || itemId,
@@ -106,9 +114,7 @@ const useRealFavorites = () => {
       );
 
       if (response && response.success) {
-        // Local state'i güncelle
         if (newStatus) {
-          // Ürünü favoriteItems'a ekle
           const product = await getProductDetails(productId || itemId);
           if (product) {
             setFavoriteItems(prev => [...prev, product]);
@@ -123,14 +129,19 @@ const useRealFavorites = () => {
       return { success: false };
     } catch (error) {
       console.error('Favori güncelleme hatası:', error);
-      Alert.alert('Hata', 'Favori işlemi başarısız oldu.');
+      showToast({
+        title: 'Hata',
+        message: 'Favori işlemi başarısız oldu.',
+        type: 'error',
+        autoClose: true,
+        autoCloseDelay: 2000,
+      });
       return { success: false };
     }
   };
 
   const getProductDetails = async (productId) => {
     try {
-      // Ürün detaylarını backend'den al
       const response = await fetch(`${API_URL}/api/depo/urun/${productId}`);
       if (response.ok) {
         const data = await response.json();
@@ -180,6 +191,13 @@ const FavoritesScreen = ({ navigation }) => {
             const result = await toggleFavorite(item.id, item.product_id || item.id);
             if (result?.success) {
               await loadFavorites();
+              showToast({
+                title: '💔 Favoriden Çıkarıldı',
+                message: `${item.ad || item.name} favorilerden çıkarıldı.`,
+                type: 'info',
+                autoClose: true,
+                autoCloseDelay: 2000,
+              });
             }
           },
           style: 'destructive'
@@ -218,6 +236,13 @@ const FavoritesScreen = ({ navigation }) => {
             await loadFavorites();
             setSelectedItems([]);
             setIsSelectionMode(false);
+            showToast({
+              title: '🗑️ Toplu Kaldırıldı',
+              message: `${selectedItems.length} ürün favorilerden kaldırıldı.`,
+              type: 'info',
+              autoClose: true,
+              autoCloseDelay: 2000,
+            });
           },
           style: 'destructive'
         }
@@ -255,8 +280,8 @@ const FavoritesScreen = ({ navigation }) => {
         </TouchableOpacity>
         
         <View>
-          <Text style={styles.title}>FAVORİLERİM</Text>
-          <Text style={styles.subtitle}>
+          <Text style={[styles.title, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>FAVORİLERİM</Text>
+          <Text style={[styles.subtitle, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
             {favoritesCount} {favoritesCount === 1 ? 'ÜRÜN' : 'ÜRÜN'}
           </Text>
         </View>
@@ -283,7 +308,7 @@ const FavoritesScreen = ({ navigation }) => {
             style={styles.deleteButton}
           >
             <Ionicons name="trash-outline" size={12} color={COLORS.white} />
-            <Text style={styles.deleteButtonText}>
+            <Text style={[styles.deleteButtonText, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
               {selectedItems.length}
             </Text>
           </TouchableOpacity>
@@ -334,13 +359,13 @@ const FavoritesScreen = ({ navigation }) => {
             <Image source={{ uri: imageUrl }} style={styles.productImage} />
             
             <View style={styles.productInfo}>
-              <Text style={styles.productBrand}>{productBrand}</Text>
-              <Text style={styles.productName} numberOfLines={2}>{productName}</Text>
+              <Text style={[styles.productBrand, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{productBrand}</Text>
+              <Text style={[styles.productName, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]} numberOfLines={2}>{productName}</Text>
               {productColor && (
-                <Text style={styles.productColor}>{productColor}</Text>
+                <Text style={[styles.productColor, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{productColor}</Text>
               )}
               {price && (
-                <Text style={styles.productPrice}>₺{formatPrice(price)}</Text>
+                <Text style={[styles.productPrice, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>₺{formatPrice(price)}</Text>
               )}
             </View>
             
@@ -359,20 +384,32 @@ const FavoritesScreen = ({ navigation }) => {
     );
   }, [isSelectionMode, selectedItems, toggleItemSelection, handleRemoveFavorite, toggleSelectionMode, handleProductPress]);
 
+  // ============================================================
+  // 📌 EMPTY STATE - REVİZE (Premium Kart Eklendi)
+  // ============================================================
   const renderEmptyState = useCallback(() => (
     <View style={styles.emptyContainer}>
       <View style={styles.emptyIconContainer}>
         <Ionicons name="heart-outline" size={40} color={COLORS.grayMedium} />
       </View>
-      <Text style={styles.emptyTitle}>HENÜZ FAVORİN YOK</Text>
-      <Text style={styles.emptyText}>
+      <Text style={[styles.emptyTitle, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>HENÜZ FAVORİN YOK</Text>
+      <Text style={[styles.emptyText, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
         Beğendiğin ürünleri favorilere ekleyerek buradan takip edebilirsin.
       </Text>
       <TouchableOpacity 
         style={styles.exploreButton}
-        onPress={() => navigation?.goBack()}
+        onPress={() => {
+          showToast({
+            title: '🛍️ Alışverişe Başla',
+            message: 'Senin için en iyi ürünleri keşfetmeye hazır mısın?',
+            type: 'success',
+            autoClose: false,
+            showPremium: true,
+          });
+          navigation.navigate('Vitrinim', { initialTab: 'shop' });
+        }}
       >
-        <Text style={styles.exploreButtonText}>ALIŞVERİŞE BAŞLA</Text>
+        <Text style={[styles.exploreButtonText, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>ALIŞVERİŞE BAŞLA</Text>
       </TouchableOpacity>
     </View>
   ), [navigation]);
@@ -386,7 +423,7 @@ const FavoritesScreen = ({ navigation }) => {
         <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.black} />
-          <Text style={styles.loadingText}>YÜKLENİYOR...</Text>
+          <Text style={[styles.loadingText, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>YÜKLENİYOR...</Text>
         </View>
       </SafeAreaView>
     );

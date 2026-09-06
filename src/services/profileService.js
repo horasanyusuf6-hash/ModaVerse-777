@@ -1,83 +1,136 @@
-// 📁 src/services/profileService.js
-import { db } from '../config/firebase';
-import { doc, getDoc, setDoc, updateDoc } from 'firebase/firestore';
+// 📁 src/services/profileService.js - REVİZE
 
-const COLLECTION = 'users';
+import { profileService as firestoreProfile } from './firestoreService';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Profil oluştur (ilk kayıtta)
-export const createUserProfile = async (userId, email, displayName = '') => {
-  try {
-    const userRef = doc(db, COLLECTION, userId);
-    const profile = {
-      email,
-      displayName: displayName || email.split('@')[0],
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      bodyMeasurements: {
-        height: null,
-        weight: null,
-        topSize: null,
-        bottomSize: null,
-        shoeSize: null,
-        dressSize: null,
-      },
-      stylePreferences: {
-        favoriteColors: [],
-        preferredBrands: [],
-        avoidedStyles: [],
-        favoriteCategories: [],
-      },
-      addresses: [],
-      notifications: true,
-      defaultCurrency: 'TRY',
-    };
-    
-    await setDoc(userRef, profile);
-    return { success: true, data: profile };
-  } catch (error) {
-    console.error('Profil oluşturma hatası:', error);
-    return { success: false, error: error.message };
+// ============================================================
+// 📌 PROFİL SERVİSİ
+// ============================================================
+
+class ProfileService {
+  constructor() {
+    this.cache = {};
   }
-};
 
-// Profil getir
-export const getUserProfile = async (userId) => {
-  try {
-    const userRef = doc(db, COLLECTION, userId);
-    const docSnap = await getDoc(userRef);
-    
-    if (docSnap.exists()) {
-      return { success: true, data: { id: docSnap.id, ...docSnap.data() } };
-    } else {
-      return { success: false, error: 'Profil bulunamadı', notFound: true };
+  /**
+   * Kullanıcı profili oluştur
+   */
+  async createProfile(userId, data) {
+    const result = await firestoreProfile.createProfile(userId, data);
+    if (result.success) {
+      this.cache[userId] = data;
+      await this.saveToCache(userId, data);
     }
-  } catch (error) {
-    console.error('Profil getirme hatası:', error);
-    return { success: false, error: error.message };
+    return result;
   }
-};
 
-// Profil güncelle
-export const updateUserProfile = async (userId, updateData) => {
-  try {
-    const userRef = doc(db, COLLECTION, userId);
-    await updateDoc(userRef, {
-      ...updateData,
-      updatedAt: new Date().toISOString(),
-    });
-    return { success: true };
-  } catch (error) {
-    console.error('Profil güncelleme hatası:', error);
-    return { success: false, error: error.message };
+  /**
+   * Kullanıcı profili getir
+   */
+  async getProfile(userId) {
+    // Cache kontrolü
+    if (this.cache[userId]) {
+      return { success: true, data: this.cache[userId] };
+    }
+
+    // Local kontrol
+    const localProfile = await this.loadFromCache(userId);
+    if (localProfile) {
+      this.cache[userId] = localProfile;
+      return { success: true, data: localProfile };
+    }
+
+    // Firestore'dan getir
+    const result = await firestoreProfile.getProfile(userId);
+    if (result.success) {
+      this.cache[userId] = result.data;
+      await this.saveToCache(userId, result.data);
+    }
+    return result;
   }
-};
 
-// Sadece beden ölçülerini güncelle
-export const updateBodyMeasurements = async (userId, measurements) => {
-  return updateUserProfile(userId, { bodyMeasurements: measurements });
-};
+  /**
+   * Kullanıcı profili güncelle
+   */
+  async updateProfile(userId, data) {
+    const result = await firestoreProfile.updateProfile(userId, data);
+    if (result.success) {
+      if (this.cache[userId]) {
+        this.cache[userId] = { ...this.cache[userId], ...data };
+      }
+      await this.saveToCache(userId, this.cache[userId]);
+    }
+    return result;
+  }
 
-// Sadece stil tercihlerini güncelle
-export const updateStylePreferences = async (userId, preferences) => {
-  return updateUserProfile(userId, { stylePreferences: preferences });
-};
+  /**
+   * Beden ölçülerini güncelle
+   */
+  async updateBodyMeasurements(userId, measurements) {
+    const result = await firestoreProfile.updateBodyMeasurements(userId, measurements);
+    if (result.success) {
+      if (this.cache[userId]) {
+        this.cache[userId].bodyMeasurements = measurements;
+        await this.saveToCache(userId, this.cache[userId]);
+      }
+    }
+    return result;
+  }
+
+  /**
+   * Stil tercihlerini güncelle
+   */
+  async updateStylePreferences(userId, preferences) {
+    const result = await firestoreProfile.updateStylePreferences(userId, preferences);
+    if (result.success) {
+      if (this.cache[userId]) {
+        this.cache[userId].stylePreferences = preferences;
+        await this.saveToCache(userId, this.cache[userId]);
+      }
+    }
+    return result;
+  }
+
+  // ============================================================
+  // 📌 CACHE İŞLEMLERİ
+  // ============================================================
+
+  async saveToCache(userId, data) {
+    try {
+      const key = `@profile_${userId}`;
+      await AsyncStorage.setItem(key, JSON.stringify(data));
+    } catch (error) {
+      console.error('Cache kaydetme hatası:', error);
+    }
+  }
+
+  async loadFromCache(userId) {
+    try {
+      const key = `@profile_${userId}`;
+      const data = await AsyncStorage.getItem(key);
+      return data ? JSON.parse(data) : null;
+    } catch (error) {
+      console.error('Cache yükleme hatası:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Cache'i temizle
+   */
+  clearCache(userId) {
+    delete this.cache[userId];
+  }
+
+  /**
+   * Tüm cache'i temizle
+   */
+  clearAllCache() {
+    this.cache = {};
+  }
+}
+
+// Singleton instance
+export const profileService = new ProfileService();
+
+export default profileService;

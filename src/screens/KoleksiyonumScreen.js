@@ -1,5 +1,6 @@
-// 📁 src/screens/KoleksiyonumScreen.js - REVİZE (NaN Hatası Düzeltildi)
-import React, { useState, useEffect, useCallback } from 'react';
+// 📁 src/screens/KoleksiyonumScreen.js - REVİZE (Premium Kart Eklendi)
+
+import React, { useState, useEffect, useCallback, useContext } from 'react';
 import {
   View,
   Text,
@@ -16,13 +17,27 @@ import {
   Dimensions,
   ActivityIndicator,
   RefreshControl,
-  Platform
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
-import { COLORS, TYPOGRAPHY, SIZES, SHADOWS } from '../constants/Theme';
+import { COLORS, TYPOGRAPHY, SIZES, getThemeColors } from '../constants/Theme';
+import { LinearGradient } from 'expo-linear-gradient';
+import { ThemeContext } from '../../App';
+
+// ============================================================
+// 📌 TOAST İMPORTU
+// ============================================================
+import { showToast } from '../components/CustomAlert';
+
+// ============================================================
+// 📌 SERVİS İMPORTLARI
+// ============================================================
+import imagePoolService from '../services/imagePoolService';
+import aiAdvisorService from '../services/aiAdvisorService';
 
 const { width, height } = Dimensions.get('window');
 
@@ -39,6 +54,12 @@ const CATEGORIES = [
 // 📏 BEDEN SEÇENEKLERİ
 const SIZE_OPTIONS = ['XS', 'S', 'M', 'L', 'XL', 'XXL'];
 
+// 🆕 RENK SEÇENEKLERİ
+const COLOR_OPTIONS = [
+  'Siyah', 'Beyaz', 'Kırmızı', 'Mavi', 'Yeşil', 'Sarı', 'Turuncu', 'Mor', 'Pembe',
+  'Kahverengi', 'Gri', 'Bej', 'Bordo', 'Hardal', 'Lacivert', 'Krem', 'Haki', 'Gümüş', 'Altın'
+];
+
 // 📊 SIRALAMA SEÇENEKLERİ
 const SORT_OPTIONS = [
   { id: 'date_desc', name: 'EN YENİ', icon: 'time-outline' },
@@ -48,15 +69,160 @@ const SORT_OPTIONS = [
   { id: 'name_asc', name: 'İSİM (A-Z)', icon: 'text-outline' },
 ];
 
-// ============ ÜRÜN EKLEME MODALI ============
+// 🆕 FİLTRE SEÇENEKLERİ
+const FILTER_OPTIONS = [
+  { id: 'all', label: 'TÜMÜ', icon: 'grid-outline' },
+  { id: 'starred', label: '⭐ FAVORİ', icon: 'star' },
+  { id: 'unstarred', label: '☆ DİĞER', icon: 'star-outline' },
+];
+
+// 📌 HAZIR ÜRÜN ŞABLONLARI
+const PRODUCT_TEMPLATES = [
+  {
+    id: 'template_1',
+    name: 'Beyaz Basic Tişört',
+    brand: 'ModaVerse',
+    category: 'üst',
+    size: 'M',
+    color: 'Beyaz',
+    model: 'Basic',
+    price: 199,
+    image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=200',
+    isTemplate: true,
+  },
+  {
+    id: 'template_2',
+    name: 'Siyah Oversize Hoodie',
+    brand: 'ModaVerse',
+    category: 'üst',
+    size: 'L',
+    color: 'Siyah',
+    model: 'Oversize',
+    price: 399,
+    image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=200',
+    isTemplate: true,
+  },
+  {
+    id: 'template_3',
+    name: 'Bej Keten Pantolon',
+    brand: 'ModaVerse',
+    category: 'alt',
+    size: 'M',
+    color: 'Bej',
+    model: 'Keten',
+    price: 499,
+    image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=200',
+    isTemplate: true,
+  },
+  {
+    id: 'template_4',
+    name: 'Krem Elbise',
+    brand: 'ModaVerse',
+    category: 'üst',
+    size: 'S',
+    color: 'Krem',
+    model: 'Elbise',
+    price: 699,
+    image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=200',
+    isTemplate: true,
+  },
+  {
+    id: 'template_5',
+    name: 'Beyaz Sneaker',
+    brand: 'ModaVerse',
+    category: 'ayakkabı',
+    size: '42',
+    color: 'Beyaz',
+    model: 'Sneaker',
+    price: 899,
+    image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200',
+    isTemplate: true,
+  },
+  {
+    id: 'template_6',
+    name: 'Deri Ceket',
+    brand: 'ModaVerse',
+    category: 'dış',
+    size: 'L',
+    color: 'Siyah',
+    model: 'Deri',
+    price: 1299,
+    image: 'https://images.unsplash.com/photo-1551028719-00167b16eac5?w=200',
+    isTemplate: true,
+  },
+];
+
+// ============================================================
+// 📌 MARKA FİLTRE MODALI
+// ============================================================
+const BrandFilterModal = ({ visible, brands, selectedBrand, onSelect, onClose }) => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
+      <View style={styles.modalOverlay}>
+        <View style={[styles.filterModalContainer, { backgroundColor: colors.card }]}>
+          <View style={[styles.filterModalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.filterModalTitle, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>MARKA FİLTRELE</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false}>
+            <TouchableOpacity
+              style={[styles.filterBrandItem, selectedBrand === null && styles.filterBrandItemActive, { borderBottomColor: colors.border }]}
+              onPress={() => onSelect(null)}
+            >
+              <Text style={[styles.filterBrandText, selectedBrand === null && styles.filterBrandTextActive, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
+                Tüm Markalar
+              </Text>
+              {selectedBrand === null && (
+                <Ionicons name="checkmark" size={18} color={colors.text} />
+              )}
+            </TouchableOpacity>
+
+            {brands.map((brand) => (
+              <TouchableOpacity
+                key={brand}
+                style={[styles.filterBrandItem, selectedBrand === brand && styles.filterBrandItemActive, { borderBottomColor: colors.border }]}
+                onPress={() => onSelect(brand)}
+              >
+                <Text style={[styles.filterBrandText, selectedBrand === brand && styles.filterBrandTextActive, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
+                  {brand}
+                </Text>
+                {selectedBrand === brand && (
+                  <Ionicons name="checkmark" size={18} color={colors.text} />
+                )}
+              </TouchableOpacity>
+            ))}
+          </ScrollView>
+        </View>
+      </View>
+    </Modal>
+  );
+};
+
+// ============================================================
+// 📌 ÜRÜN EKLEME MODALI
+// ============================================================
 const AddProductModal = ({ visible, onClose, onAdd }) => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
+
   const [name, setName] = useState('');
   const [brand, setBrand] = useState('');
   const [category, setCategory] = useState('üst');
   const [size, setSize] = useState('M');
+  const [color, setColor] = useState('Beyaz');
+  const [model, setModel] = useState('');
   const [price, setPrice] = useState('');
-  const [image, setImage] = useState('');
+  const [image, setImage] = useState(null);
   const [uploading, setUploading] = useState(false);
+  const [showTemplates, setShowTemplates] = useState(true);
 
   const pickImage = async (source) => {
     try {
@@ -64,7 +230,13 @@ const AddProductModal = ({ visible, onClose, onAdd }) => {
       if (source === 'camera') {
         const { status } = await ImagePicker.requestCameraPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Hata', 'Kamera izni gerekli!');
+          showToast({
+            title: 'Hata',
+            message: 'Kamera izni gerekli!',
+            type: 'error',
+            autoClose: true,
+            autoCloseDelay: 2000,
+          });
           return;
         }
         result = await ImagePicker.launchCameraAsync({
@@ -75,7 +247,13 @@ const AddProductModal = ({ visible, onClose, onAdd }) => {
       } else {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (status !== 'granted') {
-          Alert.alert('Hata', 'Galeri izni gerekli!');
+          showToast({
+            title: 'Hata',
+            message: 'Galeri izni gerekli!',
+            type: 'error',
+            autoClose: true,
+            autoCloseDelay: 2000,
+          });
           return;
         }
         result = await ImagePicker.launchImageLibraryAsync({
@@ -94,25 +272,55 @@ const AddProductModal = ({ visible, onClose, onAdd }) => {
         );
         setImage(manipulated.uri);
         setUploading(false);
+        setShowTemplates(false);
       }
     } catch (error) {
       console.error('Fotoğraf seçme hatası:', error);
       setUploading(false);
-      Alert.alert('Hata', 'Fotoğraf seçilemedi');
+      showToast({
+        title: 'Hata',
+        message: 'Fotoğraf seçilemedi.',
+        type: 'error',
+        autoClose: true,
+        autoCloseDelay: 2000,
+      });
     }
   };
 
-  const handleAdd = () => {
+  const removeImage = () => {
+    setImage(null);
+    setShowTemplates(true);
+  };
+
+  const handleAdd = async () => {
     if (!name.trim()) {
-      Alert.alert('Hata', 'Ürün adı giriniz!');
+      showToast({
+        title: 'Hata',
+        message: 'Ürün adı giriniz!',
+        type: 'error',
+        autoClose: true,
+        autoCloseDelay: 2000,
+      });
       return;
     }
     if (!brand.trim()) {
-      Alert.alert('Hata', 'Marka giriniz!');
+      showToast({
+        title: 'Hata',
+        message: 'Marka giriniz!',
+        type: 'error',
+        autoClose: true,
+        autoCloseDelay: 2000,
+      });
       return;
     }
     if (!price.trim()) {
-      Alert.alert('Hata', 'Fiyat giriniz!');
+      showToast({
+        title: 'Hata',
+        message: 'Fiyat giriniz!',
+        type: 'error',
+        autoClose: true,
+        autoCloseDelay: 2000,
+      });
       return;
     }
 
@@ -122,37 +330,98 @@ const AddProductModal = ({ visible, onClose, onAdd }) => {
       brand: brand.trim(),
       category,
       size,
+      color,
+      model: model.trim(),
       price: parseFloat(price.replace(/\./g, '')) || 0,
       image: image || 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=200',
       createdAt: new Date().toISOString(),
+      isStar: false,
     };
 
+    try {
+      await imagePoolService.addProductToPool({
+        name: newProduct.name,
+        imageUrl: newProduct.image,
+        category: newProduct.category,
+        brand: newProduct.brand,
+        tags: [newProduct.color, newProduct.model, newProduct.size],
+      });
+    } catch (error) {
+      console.error('Görsel havuzuna ekleme hatası:', error);
+    }
+
     onAdd(newProduct);
+    resetForm();
+    onClose();
+    showToast({
+      title: '🎉 Ürün Eklendi',
+      message: `${newProduct.name} koleksiyonuna eklendi! Gardırobun büyüyor.`,
+      type: 'success',
+      autoClose: false,
+      showPremium: true,
+    });
+  };
+
+  const resetForm = () => {
     setName('');
     setBrand('');
     setPrice('');
     setCategory('üst');
     setSize('M');
-    setImage('');
-    onClose();
-    Alert.alert('Başarılı', 'Ürün eklendi!');
+    setColor('Beyaz');
+    setModel('');
+    setImage(null);
+    setShowTemplates(true);
+  };
+
+  const handleTemplateSelect = (template) => {
+    setName(template.name);
+    setBrand(template.brand);
+    setCategory(template.category);
+    setSize(template.size);
+    setColor(template.color || 'Beyaz');
+    setModel(template.model || '');
+    setPrice(template.price.toString());
+    setImage(template.image);
+    setShowTemplates(false);
   };
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, SHADOWS.heavy]}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>YENİ ÜRÜN EKLE</Text>
-            <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={COLORS.charcoal} />
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>YENİ ÜRÜN EKLE</Text>
+            <TouchableOpacity onPress={() => { resetForm(); onClose(); }}>
+              <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.modalScroll}>
+            {showTemplates && (
+              <View style={styles.templatesSection}>
+                <Text style={[styles.templatesTitle, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>⭐ HAZIR ÜRÜNLER</Text>
+                <Text style={[styles.templatesSubtitle, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>Denemek için bir ürün seç, sonra düzenleyebilirsin.</Text>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.templatesScroll}>
+                  {PRODUCT_TEMPLATES.map((template) => (
+                    <TouchableOpacity
+                      key={template.id}
+                      style={[styles.templateCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                      onPress={() => handleTemplateSelect(template)}
+                    >
+                      <Image source={{ uri: template.image }} style={styles.templateImage} />
+                      <Text style={[styles.templateName, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]} numberOfLines={1}>{template.name}</Text>
+                      <Text style={[styles.templatePrice, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>₺{template.price}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+                <View style={[styles.templatesDivider, { backgroundColor: colors.border }]} />
+              </View>
+            )}
+
             <View style={styles.imagePickerContainer}>
               <TouchableOpacity 
-                style={styles.imagePickerButton} 
+                style={[styles.imagePickerButton, { backgroundColor: colors.surface, borderColor: colors.border }]} 
                 onPress={() => Alert.alert(
                   'Fotoğraf Ekle',
                   'Fotoğrafı nereden eklemek istersiniz?',
@@ -164,12 +433,17 @@ const AddProductModal = ({ visible, onClose, onAdd }) => {
                 )}
               >
                 {image ? (
-                  <Image source={{ uri: image }} style={styles.imagePreview} />
+                  <>
+                    <Image source={{ uri: image }} style={styles.imagePreview} />
+                    <TouchableOpacity style={styles.imageRemoveButton} onPress={removeImage}>
+                      <Ionicons name="close" size={16} color={COLORS.white} />
+                    </TouchableOpacity>
+                  </>
                 ) : (
                   <View style={styles.imagePlaceholder}>
-                    <Ionicons name="camera-outline" size={40} color={COLORS.silver} />
-                    <Text style={styles.imagePlaceholderText}>FOTOĞRAF EKLE</Text>
-                    <Text style={styles.imagePlaceholderSubtext}>Kamera veya Galeri</Text>
+                    <Ionicons name="camera-outline" size={40} color={colors.textSecondary} />
+                    <Text style={[styles.imagePlaceholderText, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>FOTOĞRAF EKLE</Text>
+                    <Text style={[styles.imagePlaceholderSubtext, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>Kamera veya Galeri</Text>
                   </View>
                 )}
                 {uploading && (
@@ -181,38 +455,49 @@ const AddProductModal = ({ visible, onClose, onAdd }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>ÜRÜN ADI</Text>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>ÜRÜN ADI</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}
                 placeholder="Ör: Oversize Blazer"
-                placeholderTextColor={COLORS.silver}
+                placeholderTextColor={colors.textSecondary}
                 value={name}
                 onChangeText={setName}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>MARKA</Text>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>MARKA</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}
                 placeholder="Ör: ZARA, Nike, Mango"
-                placeholderTextColor={COLORS.silver}
+                placeholderTextColor={colors.textSecondary}
                 value={brand}
                 onChangeText={setBrand}
               />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>KATEGORİ</Text>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>MODEL</Text>
+              <TextInput
+                style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}
+                placeholder="Ör: Basic, Oversize, Vintage"
+                placeholderTextColor={colors.textSecondary}
+                value={model}
+                onChangeText={setModel}
+              />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>KATEGORİ</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {CATEGORIES.filter(c => c.id !== 'all').map((cat) => (
                   <TouchableOpacity
                     key={cat.id}
-                    style={[styles.categorySelect, category === cat.id && styles.categorySelectActive]}
+                    style={[styles.categorySelect, category === cat.id && styles.categorySelectActive, { backgroundColor: colors.surface, borderColor: colors.border }]}
                     onPress={() => setCategory(cat.id)}
                   >
-                    <Ionicons name={cat.icon} size={14} color={category === cat.id ? COLORS.white : COLORS.charcoal} />
-                    <Text style={[styles.categorySelectText, category === cat.id && styles.categorySelectTextActive]}>
+                    <Ionicons name={cat.icon} size={14} color={category === cat.id ? COLORS.white : colors.text} />
+                    <Text style={[styles.categorySelectText, category === cat.id && styles.categorySelectTextActive, { color: category === cat.id ? COLORS.white : colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
                       {cat.name}
                     </Text>
                   </TouchableOpacity>
@@ -221,15 +506,33 @@ const AddProductModal = ({ visible, onClose, onAdd }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>BEDEN</Text>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>RENK</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {COLOR_OPTIONS.map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.colorSelect, color === c && styles.colorSelectActive, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    onPress={() => setColor(c)}
+                  >
+                    <View style={[styles.colorDot, { backgroundColor: c.toLowerCase() === 'beyaz' ? '#f5f5f5' : c.toLowerCase() }]} />
+                    <Text style={[styles.colorSelectText, color === c && styles.colorSelectTextActive, { color: color === c ? COLORS.white : colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
+                      {c}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>BEDEN</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {SIZE_OPTIONS.map((s) => (
                   <TouchableOpacity
                     key={s}
-                    style={[styles.sizeSelect, size === s && styles.sizeSelectActive]}
+                    style={[styles.sizeSelect, size === s && styles.sizeSelectActive, { backgroundColor: colors.surface, borderColor: colors.border }]}
                     onPress={() => setSize(s)}
                   >
-                    <Text style={[styles.sizeSelectText, size === s && styles.sizeSelectTextActive]}>
+                    <Text style={[styles.sizeSelectText, size === s && styles.sizeSelectTextActive, { color: size === s ? COLORS.white : colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
                       {s}
                     </Text>
                   </TouchableOpacity>
@@ -238,11 +541,11 @@ const AddProductModal = ({ visible, onClose, onAdd }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>FİYAT (₺)</Text>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>FİYAT (₺)</Text>
               <TextInput
-                style={styles.input}
+                style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}
                 placeholder="Ör: 799"
-                placeholderTextColor={COLORS.silver}
+                placeholderTextColor={colors.textSecondary}
                 value={price}
                 onChangeText={setPrice}
                 keyboardType="numeric"
@@ -250,21 +553,36 @@ const AddProductModal = ({ visible, onClose, onAdd }) => {
             </View>
 
             <TouchableOpacity style={styles.addButton} onPress={handleAdd}>
-              <Text style={styles.addButtonText}>ÜRÜNÜ EKLE</Text>
+              <LinearGradient
+                colors={[COLORS.charcoal, COLORS.black]}
+                style={styles.addButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={[styles.addButtonText, { color: COLORS.white, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>ÜRÜNÜ EKLE</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
-// ============ ÜRÜN DÜZENLEME MODALI ============
+// ============================================================
+// 📌 ÜRÜN DÜZENLEME MODALI
+// ============================================================
 const EditProductModal = ({ visible, product, onClose, onSave }) => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
+
   const [name, setName] = useState(product?.name || '');
   const [brand, setBrand] = useState(product?.brand || '');
   const [category, setCategory] = useState(product?.category || 'üst');
   const [size, setSize] = useState(product?.size || 'M');
+  const [color, setColor] = useState(product?.color || 'Beyaz');
+  const [model, setModel] = useState(product?.model || '');
   const [price, setPrice] = useState(product?.price?.toString() || '');
   const [image, setImage] = useState(product?.image || '');
 
@@ -274,6 +592,8 @@ const EditProductModal = ({ visible, product, onClose, onSave }) => {
       setBrand(product.brand || '');
       setCategory(product.category || 'üst');
       setSize(product.size || 'M');
+      setColor(product.color || 'Beyaz');
+      setModel(product.model || '');
       setPrice(product.price?.toString() || '');
       setImage(product.image || '');
     }
@@ -281,11 +601,23 @@ const EditProductModal = ({ visible, product, onClose, onSave }) => {
 
   const handleSave = () => {
     if (!name.trim()) {
-      Alert.alert('Hata', 'Ürün adı giriniz!');
+      showToast({
+        title: 'Hata',
+        message: 'Ürün adı giriniz!',
+        type: 'error',
+        autoClose: true,
+        autoCloseDelay: 2000,
+      });
       return;
     }
     if (!price.trim()) {
-      Alert.alert('Hata', 'Fiyat giriniz!');
+      showToast({
+        title: 'Hata',
+        message: 'Fiyat giriniz!',
+        type: 'error',
+        autoClose: true,
+        autoCloseDelay: 2000,
+      });
       return;
     }
 
@@ -295,46 +627,64 @@ const EditProductModal = ({ visible, product, onClose, onSave }) => {
       brand: brand.trim(),
       category,
       size,
+      color,
+      model: model.trim(),
       price: parseFloat(price) || 0,
       image: image || product?.image,
     });
     onClose();
-    Alert.alert('Başarılı', 'Ürün güncellendi!');
+    showToast({
+      title: '✏️ Ürün Güncellendi',
+      message: `${name} başarıyla güncellendi.`,
+      type: 'success',
+      autoClose: false,
+      showPremium: true,
+    });
   };
 
   return (
     <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose}>
-      <View style={styles.modalOverlay}>
-        <View style={[styles.modalContent, SHADOWS.heavy]}>
-          <View style={styles.modalHeader}>
-            <Text style={styles.modalTitle}>ÜRÜN DÜZENLE</Text>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalOverlay}>
+        <View style={[styles.modalContent, { backgroundColor: colors.card }]}>
+          <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.modalTitle, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>ÜRÜN DÜZENLE</Text>
             <TouchableOpacity onPress={onClose}>
-              <Ionicons name="close" size={24} color={COLORS.charcoal} />
+              <Ionicons name="close" size={24} color={colors.text} />
             </TouchableOpacity>
           </View>
 
-          <ScrollView showsVerticalScrollIndicator={false}>
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>ÜRÜN ADI</Text>
-              <TextInput style={styles.input} value={name} onChangeText={setName} />
+          <ScrollView showsVerticalScrollIndicator={false} style={styles.modalScroll}>
+            <View style={styles.editImageContainer}>
+              <Image source={{ uri: image || 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=200' }} style={[styles.editImage, { borderColor: colors.border }]} />
+              <Text style={[styles.editImageLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>Mevcut Fotoğraf</Text>
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>MARKA</Text>
-              <TextInput style={styles.input} value={brand} onChangeText={setBrand} placeholder="Marka adı" />
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>ÜRÜN ADI</Text>
+              <TextInput style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]} value={name} onChangeText={setName} />
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>KATEGORİ</Text>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>MARKA</Text>
+              <TextInput style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]} value={brand} onChangeText={setBrand} placeholder="Marka adı" placeholderTextColor={colors.textSecondary} />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>MODEL</Text>
+              <TextInput style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]} value={model} onChangeText={setModel} placeholder="Model" placeholderTextColor={colors.textSecondary} />
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>KATEGORİ</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {CATEGORIES.filter(c => c.id !== 'all').map((cat) => (
                   <TouchableOpacity
                     key={cat.id}
-                    style={[styles.categorySelect, category === cat.id && styles.categorySelectActive]}
+                    style={[styles.categorySelect, category === cat.id && styles.categorySelectActive, { backgroundColor: colors.surface, borderColor: colors.border }]}
                     onPress={() => setCategory(cat.id)}
                   >
-                    <Ionicons name={cat.icon} size={14} color={category === cat.id ? COLORS.white : COLORS.charcoal} />
-                    <Text style={[styles.categorySelectText, category === cat.id && styles.categorySelectTextActive]}>
+                    <Ionicons name={cat.icon} size={14} color={category === cat.id ? COLORS.white : colors.text} />
+                    <Text style={[styles.categorySelectText, category === cat.id && styles.categorySelectTextActive, { color: category === cat.id ? COLORS.white : colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
                       {cat.name}
                     </Text>
                   </TouchableOpacity>
@@ -343,15 +693,33 @@ const EditProductModal = ({ visible, product, onClose, onSave }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>BEDEN</Text>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>RENK</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                {COLOR_OPTIONS.map((c) => (
+                  <TouchableOpacity
+                    key={c}
+                    style={[styles.colorSelect, color === c && styles.colorSelectActive, { backgroundColor: colors.surface, borderColor: colors.border }]}
+                    onPress={() => setColor(c)}
+                  >
+                    <View style={[styles.colorDot, { backgroundColor: c.toLowerCase() === 'beyaz' ? '#f5f5f5' : c.toLowerCase() }]} />
+                    <Text style={[styles.colorSelectText, color === c && styles.colorSelectTextActive, { color: color === c ? COLORS.white : colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
+                      {c}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+
+            <View style={styles.inputGroup}>
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>BEDEN</Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false}>
                 {SIZE_OPTIONS.map((s) => (
                   <TouchableOpacity
                     key={s}
-                    style={[styles.sizeSelect, size === s && styles.sizeSelectActive]}
+                    style={[styles.sizeSelect, size === s && styles.sizeSelectActive, { backgroundColor: colors.surface, borderColor: colors.border }]}
                     onPress={() => setSize(s)}
                   >
-                    <Text style={[styles.sizeSelectText, size === s && styles.sizeSelectTextActive]}>
+                    <Text style={[styles.sizeSelectText, size === s && styles.sizeSelectTextActive, { color: size === s ? COLORS.white : colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
                       {s}
                     </Text>
                   </TouchableOpacity>
@@ -360,38 +728,62 @@ const EditProductModal = ({ visible, product, onClose, onSave }) => {
             </View>
 
             <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>FİYAT (₺)</Text>
-              <TextInput style={styles.input} value={price} onChangeText={setPrice} keyboardType="numeric" />
+              <Text style={[styles.inputLabel, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>FİYAT (₺)</Text>
+              <TextInput style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]} value={price} onChangeText={setPrice} keyboardType="numeric" />
             </View>
 
             <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-              <Text style={styles.saveButtonText}>KAYDET</Text>
+              <LinearGradient
+                colors={[COLORS.charcoal, COLORS.black]}
+                style={styles.addButtonGradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+              >
+                <Text style={[styles.saveButtonText, { color: COLORS.white, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>KAYDET</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </ScrollView>
         </View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 };
 
-// ============ ÜRÜN KARTI ============
-const ProductCard = ({ item, onPress }) => {
+// ============================================================
+// 📌 ÜRÜN KARTI
+// ============================================================
+const ProductCard = ({ item, onPress, onToggleStar }) => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
+
   const formatPrice = (price) => {
     if (!price && price !== 0) return '0';
     return Math.round(price).toString().replace(/\B(?=(\d{3})+(?!\d))/g, '.');
   };
 
   return (
-    <TouchableOpacity style={[styles.productCard, SHADOWS.light]} onPress={() => onPress(item)} activeOpacity={0.9}>
-      <Image source={{ uri: item.image }} style={styles.productImage} />
+    <TouchableOpacity style={[styles.productCard, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => onPress(item)} activeOpacity={0.9}>
+      <Image source={{ uri: item.image }} style={[styles.productImage, { backgroundColor: colors.surface }]} />
+      <TouchableOpacity 
+        style={[styles.starButton, { backgroundColor: isDark ? 'rgba(0,0,0,0.7)' : 'rgba(255,255,255,0.85)' }]} 
+        onPress={() => onToggleStar(item.id)}
+      >
+        <Ionicons 
+          name={item.isStar ? 'star' : 'star-outline'} 
+          size={16} 
+          color={item.isStar ? COLORS.cognac : colors.textSecondary} 
+        />
+      </TouchableOpacity>
       <View style={styles.productInfo}>
-        <Text style={styles.productName} numberOfLines={1}>{item.name || 'İsimsiz'}</Text>
-        {item.brand && <Text style={styles.productBrand} numberOfLines={1}>{item.brand}</Text>}
+        <Text style={[styles.productName, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]} numberOfLines={1}>{item.name || 'İsimsiz'}</Text>
+        {item.brand && <Text style={[styles.productBrand, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]} numberOfLines={1}>{item.brand}</Text>}
+        {item.color && <Text style={[styles.productColor, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{item.color}</Text>}
         <View style={styles.productBottom}>
-          <Text style={styles.productPrice}>₺{formatPrice(item.price)}</Text>
+          <Text style={[styles.productPrice, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>₺{formatPrice(item.price)}</Text>
           {item.size && (
-            <View style={styles.productSizeBadge}>
-              <Text style={styles.productSizeText}>{item.size}</Text>
+            <View style={[styles.productSizeBadge, { backgroundColor: colors.surface }]}>
+              <Text style={[styles.productSizeText, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{item.size}</Text>
             </View>
           )}
         </View>
@@ -400,8 +792,14 @@ const ProductCard = ({ item, onPress }) => {
   );
 };
 
-// ============ ÜRÜN DETAY MODALI ============
-const ProductDetailModal = ({ visible, product, onClose, onDelete, onEdit }) => {
+// ============================================================
+// 📌 ÜRÜN DETAY MODALI
+// ============================================================
+const ProductDetailModal = ({ visible, product, onClose, onDelete, onEdit, onToggleStar }) => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
+
   if (!product) return null;
 
   const formatPrice = (price) => {
@@ -412,51 +810,81 @@ const ProductDetailModal = ({ visible, product, onClose, onDelete, onEdit }) => 
   return (
     <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
       <View style={styles.modalOverlay}>
-        <View style={[styles.detailModalContent, SHADOWS.heavy]}>
-          <Image source={{ uri: product.image }} style={styles.detailImage} />
-          <TouchableOpacity style={styles.detailCloseButton} onPress={onClose}>
-            <Ionicons name="close" size={24} color={COLORS.white} />
+        <View style={[styles.detailModalContent, { backgroundColor: colors.card }]}>
+          <Image source={{ uri: product.image }} style={[styles.detailImage, { backgroundColor: colors.surface }]} />
+          <TouchableOpacity style={[styles.detailCloseButton, { backgroundColor: colors.text }]} onPress={onClose}>
+            <Ionicons name="close" size={24} color={colors.background} />
           </TouchableOpacity>
 
           <View style={styles.detailInfo}>
-            <Text style={styles.detailName}>{product.name || 'İsimsiz'}</Text>
+            <View style={styles.detailHeaderRow}>
+              <Text style={[styles.detailName, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{product.name || 'İsimsiz'}</Text>
+              <TouchableOpacity onPress={() => onToggleStar(product.id)}>
+                <Ionicons 
+                  name={product.isStar ? 'star' : 'star-outline'} 
+                  size={24} 
+                  color={product.isStar ? COLORS.cognac : colors.textSecondary} 
+                />
+              </TouchableOpacity>
+            </View>
             {product.brand && (
-              <Text style={styles.detailBrand}>{product.brand}</Text>
+              <Text style={[styles.detailBrand, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{product.brand}</Text>
             )}
             <View style={styles.detailMeta}>
               <View style={styles.detailCategory}>
                 <Ionicons name="pricetag-outline" size={14} color={COLORS.cognac} />
-                <Text style={styles.detailCategoryText}>
+                <Text style={[styles.detailCategoryText, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
                   {CATEGORIES.find(c => c.id === product.category)?.name || product.category || 'Kategori yok'}
                 </Text>
               </View>
+              {product.color && (
+                <View style={styles.detailColor}>
+                  <Ionicons name="color-palette-outline" size={14} color={COLORS.cognac} />
+                  <Text style={[styles.detailColorText, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{product.color}</Text>
+                </View>
+              )}
               {product.size && (
                 <View style={styles.detailSize}>
                   <Ionicons name="resize-outline" size={14} color={COLORS.cognac} />
-                  <Text style={styles.detailSizeText}>BEDEN: {product.size}</Text>
+                  <Text style={[styles.detailSizeText, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>BEDEN: {product.size}</Text>
+                </View>
+              )}
+              {product.model && (
+                <View style={styles.detailModel}>
+                  <Ionicons name="cube-outline" size={14} color={COLORS.cognac} />
+                  <Text style={[styles.detailModelText, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{product.model}</Text>
                 </View>
               )}
             </View>
-            <Text style={styles.detailPrice}>₺{formatPrice(product.price)}</Text>
-            <Text style={styles.detailDate}>Eklendi: {product.createdAt ? new Date(product.createdAt).toLocaleDateString('tr-TR') : 'Bugün'}</Text>
+            <Text style={[styles.detailPrice, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>₺{formatPrice(product.price)}</Text>
+            <Text style={[styles.detailDate, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>Eklendi: {product.createdAt ? new Date(product.createdAt).toLocaleDateString('tr-TR') : 'Bugün'}</Text>
 
             <View style={styles.detailActions}>
-              <TouchableOpacity style={styles.editButton} onPress={() => { onClose(); onEdit(product); }}>
+              <TouchableOpacity style={[styles.editButton, { backgroundColor: COLORS.cognac }]} onPress={() => { onClose(); onEdit(product); }}>
                 <Ionicons name="create-outline" size={16} color={COLORS.white} />
-                <Text style={styles.editButtonText}>DÜZENLE</Text>
+                <Text style={[styles.editButtonText, { color: COLORS.white, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>DÜZENLE</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.deleteButton} onPress={() => {
+              <TouchableOpacity style={[styles.deleteButton, { backgroundColor: COLORS.error }]} onPress={() => {
                 Alert.alert(
                   'Ürünü Sil',
                   `${product.name || 'Bu ürün'} silmek istediğinize emin misiniz?`,
                   [
                     { text: 'İptal', style: 'cancel' },
-                    { text: 'Sil', onPress: () => onDelete(product.id), style: 'destructive' }
+                    { text: 'Sil', onPress: () => {
+                        onDelete(product.id);
+                        showToast({
+                          title: '🗑️ Ürün Silindi',
+                          message: `${product.name} başarıyla silindi.`,
+                          type: 'info',
+                          autoClose: true,
+                          autoCloseDelay: 2000,
+                        });
+                      }, style: 'destructive' }
                   ]
                 );
               }}>
                 <Ionicons name="trash-outline" size={16} color={COLORS.white} />
-                <Text style={styles.deleteButtonText}>SİL</Text>
+                <Text style={[styles.deleteButtonText, { color: COLORS.white, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>SİL</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -466,43 +894,57 @@ const ProductDetailModal = ({ visible, product, onClose, onDelete, onEdit }) => 
   );
 };
 
-// ============ SIRALAMA MODALI ============
-const SortModal = ({ visible, onClose, selectedSort, onSelect }) => (
-  <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
-    <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
-      <View style={[styles.sortModalContainer, SHADOWS.medium]}>
-        <View style={styles.sortModalHeader}>
-          <Text style={styles.sortModalTitle}>SIRALAMA</Text>
-          <TouchableOpacity onPress={onClose}>
-            <Ionicons name="close" size={24} color={COLORS.charcoal} />
-          </TouchableOpacity>
-        </View>
-        {SORT_OPTIONS.map((option) => (
-          <TouchableOpacity
-            key={option.id}
-            style={[styles.sortOption, selectedSort === option.id && styles.sortOptionActive]}
-            onPress={() => onSelect(option.id)}
-          >
-            <Ionicons 
-              name={option.icon} 
-              size={18} 
-              color={selectedSort === option.id ? COLORS.cognac : COLORS.silver} 
-            />
-            <Text style={[styles.sortOptionText, selectedSort === option.id && styles.sortOptionTextActive]}>
-              {option.name}
-            </Text>
-            {selectedSort === option.id && (
-              <Ionicons name="checkmark" size={16} color={COLORS.cognac} />
-            )}
-          </TouchableOpacity>
-        ))}
-      </View>
-    </TouchableOpacity>
-  </Modal>
-);
+// ============================================================
+// 📌 SIRALAMA MODALI
+// ============================================================
+const SortModal = ({ visible, onClose, selectedSort, onSelect }) => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
 
-// ============ ANA BİLEŞEN ============
+  return (
+    <Modal visible={visible} animationType="fade" transparent onRequestClose={onClose}>
+      <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={onClose}>
+        <View style={[styles.sortModalContainer, { backgroundColor: colors.card }]}>
+          <View style={[styles.sortModalHeader, { borderBottomColor: colors.border }]}>
+            <Text style={[styles.sortModalTitle, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>SIRALAMA</Text>
+            <TouchableOpacity onPress={onClose}>
+              <Ionicons name="close" size={24} color={colors.text} />
+            </TouchableOpacity>
+          </View>
+          {SORT_OPTIONS.map((option) => (
+            <TouchableOpacity
+              key={option.id}
+              style={[styles.sortOption, selectedSort === option.id && styles.sortOptionActive, { borderBottomColor: colors.border }]}
+              onPress={() => onSelect(option.id)}
+            >
+              <Ionicons 
+                name={option.icon} 
+                size={18} 
+                color={selectedSort === option.id ? COLORS.cognac : colors.textSecondary} 
+              />
+              <Text style={[styles.sortOptionText, selectedSort === option.id && styles.sortOptionTextActive, { color: selectedSort === option.id ? COLORS.cognac : colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
+                {option.name}
+              </Text>
+              {selectedSort === option.id && (
+                <Ionicons name="checkmark" size={16} color={COLORS.cognac} />
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      </TouchableOpacity>
+    </Modal>
+  );
+};
+
+// ============================================================
+// 📌 ANA BİLEŞEN
+// ============================================================
 const KoleksiyonumScreen = () => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
+
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -514,45 +956,42 @@ const KoleksiyonumScreen = () => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [detailModalVisible, setDetailModalVisible] = useState(false);
+  const [selectedBrand, setSelectedBrand] = useState(null);
+  const [brandFilterVisible, setBrandFilterVisible] = useState(false);
+  const [selectedFilter, setSelectedFilter] = useState('all');
 
   useEffect(() => {
+    initializeServices();
     loadProducts();
   }, []);
+
+  const initializeServices = async () => {
+    try {
+      await imagePoolService.initialize();
+    } catch (error) {
+      console.error('Görsel havuzu başlatma hatası:', error);
+    }
+  };
 
   const loadProducts = async () => {
     try {
       const saved = await AsyncStorage.getItem('@user_products');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // ✅ Her ürünün fiyatını sayıya çevir
         const fixed = parsed.map(p => ({
           ...p,
-          price: typeof p.price === 'string' ? parseFloat(p.price) || 0 : p.price || 0
+          price: typeof p.price === 'string' ? parseFloat(p.price) || 0 : p.price || 0,
+          isStar: p.isStar || false,
         }));
         setProducts(fixed);
       } else {
-        const sampleProducts = [
-          {
-            id: '1',
-            name: 'Oversize Blazer',
-            brand: 'ZARA',
-            category: 'üst',
-            size: 'L',
-            price: 799,
-            image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=200',
-            createdAt: new Date().toISOString(),
-          },
-          {
-            id: '2',
-            name: 'Air Force 1',
-            brand: 'Nike',
-            category: 'ayakkabı',
-            size: '42',
-            price: 899,
-            image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=200',
-            createdAt: new Date().toISOString(),
-          },
-        ];
+        const sampleProducts = PRODUCT_TEMPLATES.slice(0, 4).map((t, i) => ({
+          ...t,
+          id: `sample_${i + 1}`,
+          createdAt: new Date().toISOString(),
+          isTemplate: false,
+          isStar: i === 0,
+        }));
         setProducts(sampleProducts);
         await AsyncStorage.setItem('@user_products', JSON.stringify(sampleProducts));
       }
@@ -575,8 +1014,17 @@ const KoleksiyonumScreen = () => {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     await loadProducts();
+    await initializeServices();
     setTimeout(() => setRefreshing(false), 1000);
   }, []);
+
+  const getAllBrands = () => {
+    const brands = new Set();
+    products.forEach(p => {
+      if (p.brand) brands.add(p.brand);
+    });
+    return Array.from(brands).sort();
+  };
 
   const getFilteredAndSortedProducts = () => {
     let filtered = [...products];
@@ -585,11 +1033,23 @@ const KoleksiyonumScreen = () => {
       filtered = filtered.filter(p => p.category === selectedCategory);
     }
     
+    if (selectedBrand) {
+      filtered = filtered.filter(p => p.brand === selectedBrand);
+    }
+
+    if (selectedFilter === 'starred') {
+      filtered = filtered.filter(p => p.isStar === true);
+    } else if (selectedFilter === 'unstarred') {
+      filtered = filtered.filter(p => p.isStar === false);
+    }
+    
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase();
       filtered = filtered.filter(p => 
         p.name?.toLowerCase().includes(query) ||
-        p.brand?.toLowerCase().includes(query)
+        p.brand?.toLowerCase().includes(query) ||
+        p.color?.toLowerCase().includes(query) ||
+        p.model?.toLowerCase().includes(query)
       );
     }
     
@@ -631,7 +1091,16 @@ const KoleksiyonumScreen = () => {
     saveProducts(newProducts);
     setDetailModalVisible(false);
     setSelectedProduct(null);
-    Alert.alert('Başarılı', 'Ürün silindi!');
+  };
+
+  const toggleStar = (productId) => {
+    const newProducts = products.map(p => {
+      if (p.id === productId) {
+        return { ...p, isStar: !p.isStar };
+      }
+      return p;
+    });
+    saveProducts(newProducts);
   };
 
   const handleProductPress = (product) => {
@@ -645,8 +1114,6 @@ const KoleksiyonumScreen = () => {
   };
 
   const filteredProducts = getFilteredAndSortedProducts();
-  
-  // ✅ NaN ve undefined koruması
   const totalValue = products.reduce((sum, p) => sum + (typeof p.price === 'number' ? p.price : 0), 0);
   
   const formatTotalValue = (value) => {
@@ -664,57 +1131,61 @@ const KoleksiyonumScreen = () => {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.container}>
-        <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
         <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={COLORS.cognac} />
-          <Text style={styles.loadingText}>YÜKLENİYOR...</Text>
+          <ActivityIndicator size="large" color={colors.text} />
+          <Text style={[styles.loadingText, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>YÜKLENİYOR...</Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
 
+      {/* HEADER */}
       <View style={styles.header}>
-        <Text style={styles.logo}>KOLEKSİYONUM</Text>
-        <TouchableOpacity style={styles.addButtonHeader} onPress={() => setAddModalVisible(true)}>
-          <Ionicons name="add" size={24} color={COLORS.white} />
+        <Text style={[styles.logo, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>KOLEKSİYONUM</Text>
+        <TouchableOpacity style={[styles.addButtonHeader, { backgroundColor: colors.text }]} onPress={() => setAddModalVisible(true)}>
+          <Ionicons name="add" size={24} color={colors.background} />
         </TouchableOpacity>
       </View>
 
-      <View style={styles.statsCard}>
+      {/* STATS CARD */}
+      <View style={[styles.statsCard, { backgroundColor: colors.text }]}>
+        <TouchableOpacity style={styles.statItem} onPress={() => setSelectedCategory('all')}>
+          <Text style={[styles.statNumber, { color: colors.background, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{products.length}</Text>
+          <Text style={[styles.statLabel, { color: colors.background, opacity: 0.7, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>ÜRÜN</Text>
+        </TouchableOpacity>
+        <View style={[styles.statDivider, { backgroundColor: colors.background, opacity: 0.2 }]} />
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{products.length}</Text>
-          <Text style={styles.statLabel}>ÜRÜN</Text>
+          <Text style={[styles.statNumber, { color: colors.background, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>₺{formatTotalValue(totalValue)}</Text>
+          <Text style={[styles.statLabel, { color: colors.background, opacity: 0.7, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>TOPLAM DEĞER</Text>
         </View>
-        <View style={styles.statDivider} />
+        <View style={[styles.statDivider, { backgroundColor: colors.background, opacity: 0.2 }]} />
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>₺{formatTotalValue(totalValue)}</Text>
-          <Text style={styles.statLabel}>TOPLAM DEĞER</Text>
+          <Text style={[styles.statNumber, { color: colors.background, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{products.filter(p => p.isStar).length}</Text>
+          <Text style={[styles.statLabel, { color: colors.background, opacity: 0.7, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>⭐ FAVORİ</Text>
         </View>
       </View>
 
+      {/* CATEGORY STATS */}
       <View style={styles.categoryStatsWrapper}>
-        <ScrollView 
-          horizontal 
-          showsHorizontalScrollIndicator={false}
-          style={styles.categoryStatsContainer}
-        >
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categoryStatsContainer}>
           {activeCategories.map((category) => (
             <TouchableOpacity
               key={category.id}
-              style={[styles.categoryStatItem, selectedCategory === category.id && styles.categoryStatItemActive]}
+              style={[styles.categoryStatItem, selectedCategory === category.id && styles.categoryStatItemActive, { backgroundColor: selectedCategory === category.id ? colors.text : colors.surface }]}
               onPress={() => setSelectedCategory(category.id)}
             >
               <Ionicons 
                 name={category.icon} 
                 size={14} 
-                color={selectedCategory === category.id ? COLORS.white : COLORS.charcoal} 
+                color={selectedCategory === category.id ? colors.background : colors.text} 
               />
-              <Text style={[styles.categoryStatText, selectedCategory === category.id && styles.categoryStatTextActive]}>
+              <Text style={[styles.categoryStatText, selectedCategory === category.id && styles.categoryStatTextActive, { color: selectedCategory === category.id ? colors.background : colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
                 {category.name} ({category.count})
               </Text>
             </TouchableOpacity>
@@ -722,66 +1193,101 @@ const KoleksiyonumScreen = () => {
         </ScrollView>
       </View>
 
+      {/* ACTION BAR */}
       <View style={styles.actionBar}>
-        <View style={styles.searchContainer}>
-          <Ionicons name="search-outline" size={18} color={COLORS.silver} />
+        <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <Ionicons name="search-outline" size={18} color={colors.textSecondary} />
           <TextInput
-            style={styles.searchInput}
-            placeholder="Ürün veya marka ara..."
-            placeholderTextColor={COLORS.silver}
+            style={[styles.searchInput, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}
+            placeholder="Ürün, marka veya renk ara..."
+            placeholderTextColor={colors.textSecondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={16} color={COLORS.silver} />
+              <Ionicons name="close-circle" size={16} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
-        <TouchableOpacity style={styles.sortButton} onPress={() => setSortModalVisible(true)}>
-          <Ionicons name="funnel-outline" size={16} color={COLORS.charcoal} />
-          <Text style={styles.sortButtonText}>SIRALA</Text>
+        
+        <TouchableOpacity style={[styles.filterButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => setBrandFilterVisible(true)}>
+          <Ionicons name="pricetags-outline" size={16} color={colors.text} />
+          <Text style={[styles.filterButtonText, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
+            {selectedBrand || 'MARKA'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity 
+          style={[styles.filterButton, selectedFilter !== 'all' && styles.filterButtonActive, { backgroundColor: selectedFilter !== 'all' ? colors.text : colors.card, borderColor: colors.border }]} 
+          onPress={() => {
+            if (selectedFilter === 'all') setSelectedFilter('starred');
+            else if (selectedFilter === 'starred') setSelectedFilter('unstarred');
+            else setSelectedFilter('all');
+          }}
+        >
+          <Ionicons 
+            name={selectedFilter === 'starred' ? 'star' : selectedFilter === 'unstarred' ? 'star-outline' : 'star-outline'} 
+            size={16} 
+            color={selectedFilter !== 'all' ? colors.background : colors.text} 
+          />
+          <Text style={[styles.filterButtonText, selectedFilter !== 'all' && styles.filterButtonTextActive, { color: selectedFilter !== 'all' ? colors.background : colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
+            {selectedFilter === 'all' ? '⭐' : selectedFilter === 'starred' ? 'FAVORİ' : 'DİĞER'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity style={[styles.sortButton, { backgroundColor: colors.card, borderColor: colors.border }]} onPress={() => setSortModalVisible(true)}>
+          <Ionicons name="funnel-outline" size={16} color={colors.text} />
+          <Text style={[styles.sortButtonText, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>SIRALA</Text>
         </TouchableOpacity>
       </View>
 
+      {/* PRODUCTS LIST */}
       {filteredProducts.length === 0 ? (
         <View style={styles.emptyContainer}>
-          <View style={styles.emptyIconContainer}>
-            <Ionicons name="albums-outline" size={48} color={COLORS.silver} />
+          <View style={[styles.emptyIconContainer, { borderColor: colors.border }]}>
+            <Ionicons name="albums-outline" size={48} color={colors.textSecondary} />
           </View>
-          <Text style={styles.emptyTitle}>
+          <Text style={[styles.emptyTitle, { color: colors.text, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
             {searchQuery ? 'ÜRÜN BULUNAMADI' : 'HENÜZ ÜRÜN EKLENMEMİŞ'}
           </Text>
-          <Text style={styles.emptyText}>
+          <Text style={[styles.emptyText, { color: colors.textSecondary, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>
             {searchQuery 
               ? `"${searchQuery}" ile eşleşen ürün yok`
               : 'Gardırobuna ilk ürünü eklemek için + butonuna tıkla'}
           </Text>
           {searchQuery ? (
-            <TouchableOpacity style={styles.clearButton} onPress={() => setSearchQuery('')}>
-              <Text style={styles.clearButtonText}>ARAMAYI TEMİZLE</Text>
+            <TouchableOpacity style={[styles.clearButton, { backgroundColor: colors.text }]} onPress={() => setSearchQuery('')}>
+              <Text style={[styles.clearButtonText, { color: colors.background, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>ARAMAYI TEMİZLE</Text>
             </TouchableOpacity>
           ) : (
-            <TouchableOpacity style={styles.emptyButton} onPress={() => setAddModalVisible(true)}>
-              <Text style={styles.emptyButtonText}>ÜRÜN EKLE</Text>
+            <TouchableOpacity style={[styles.emptyButton, { backgroundColor: colors.text }]} onPress={() => setAddModalVisible(true)}>
+              <Text style={[styles.emptyButtonText, { color: colors.background, fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>ÜRÜN EKLE</Text>
             </TouchableOpacity>
           )}
         </View>
       ) : (
         <FlatList
           data={filteredProducts}
-          renderItem={({ item }) => <ProductCard item={item} onPress={handleProductPress} />}
+          renderItem={({ item }) => (
+            <ProductCard 
+              item={item} 
+              onPress={handleProductPress} 
+              onToggleStar={toggleStar}
+            />
+          )}
           keyExtractor={item => item.id}
           numColumns={2}
           columnWrapperStyle={styles.columnWrapper}
           contentContainerStyle={styles.productsList}
           showsVerticalScrollIndicator={false}
           refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[COLORS.cognac]} />
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} colors={[colors.text]} tintColor={colors.text} />
           }
         />
       )}
 
+      {/* MODALS */}
       <AddProductModal
         visible={addModalVisible}
         onClose={() => setAddModalVisible(false)}
@@ -810,6 +1316,7 @@ const KoleksiyonumScreen = () => {
           setDetailModalVisible(false);
           handleEditProduct(product);
         }}
+        onToggleStar={toggleStar}
       />
 
       <SortModal
@@ -821,27 +1328,31 @@ const KoleksiyonumScreen = () => {
           setSortModalVisible(false);
         }}
       />
+
+      <BrandFilterModal
+        visible={brandFilterVisible}
+        brands={getAllBrands()}
+        selectedBrand={selectedBrand}
+        onSelect={(brand) => {
+          setSelectedBrand(brand);
+          setBrandFilterVisible(false);
+        }}
+        onClose={() => setBrandFilterVisible(false)}
+      />
     </SafeAreaView>
   );
 };
 
-// ============ STILLER ============
+// ============================================================
+// 📌 STILLER (TAM REVİZE)
+// ============================================================
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: COLORS.white 
-  },
-  loadingContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    gap: SIZES.md 
-  },
-  loadingText: { 
-    ...TYPOGRAPHY.caption,
-    color: COLORS.silver 
-  },
+  container: { flex: 1 },
 
+  loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: SIZES.md },
+  loadingText: { ...TYPOGRAPHY.caption },
+
+  // HEADER
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -850,520 +1361,341 @@ const styles = StyleSheet.create({
     paddingTop: Platform.OS === 'ios' ? 12 : SIZES.md,
     paddingBottom: SIZES.xs,
   },
-  logo: { 
+  logo: {
     ...TYPOGRAPHY.caption,
-    fontSize: 14,
+    fontSize: 16,
     letterSpacing: 2,
-    color: COLORS.charcoal 
+    fontWeight: '400',
   },
   addButtonHeader: {
-    backgroundColor: COLORS.charcoal,
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     justifyContent: 'center',
     alignItems: 'center',
   },
 
+  // STATS CARD
   statsCard: {
     flexDirection: 'row',
-    backgroundColor: COLORS.charcoal,
-    marginHorizontal: SIZES.lg,
-    marginVertical: SIZES.md,
-    padding: SIZES.md,
     justifyContent: 'space-around',
+    marginHorizontal: SIZES.lg,
+    paddingVertical: SIZES.md,
+    borderRadius: 8,
+    marginBottom: SIZES.md,
   },
-  statItem: { 
-    alignItems: 'center', 
-    flex: 1 
-  },
-  statNumber: { 
-    ...TYPOGRAPHY.body,
-    fontSize: 18,
-    fontWeight: '600',
-    color: COLORS.white 
-  },
-  statLabel: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 8,
-    color: COLORS.silver, 
-    marginTop: 2 
-  },
-  statDivider: { 
-    width: 0.5, 
-    backgroundColor: COLORS.graphite 
-  },
+  statItem: { alignItems: 'center', flex: 1 },
+  statNumber: { ...TYPOGRAPHY.title3, fontSize: 18, fontWeight: '500' },
+  statLabel: { ...TYPOGRAPHY.caption, fontSize: 9, marginTop: 2 },
+  statDivider: { width: 0.5, height: 30 },
 
-  categoryStatsWrapper: { 
-    marginBottom: SIZES.md 
-  },
-  categoryStatsContainer: { 
-    flexGrow: 0, 
-    paddingHorizontal: SIZES.lg 
-  },
+  // CATEGORY STATS
+  categoryStatsWrapper: { marginBottom: SIZES.sm },
+  categoryStatsContainer: { paddingHorizontal: SIZES.lg, gap: SIZES.sm },
   categoryStatItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.porcelain,
     paddingHorizontal: SIZES.md,
-    paddingVertical: 6,
-    borderRadius: 20,
-    marginRight: SIZES.sm,
+    paddingVertical: 4,
+    borderRadius: 16,
     gap: 4,
+    marginRight: 6,
   },
-  categoryStatItemActive: { 
-    backgroundColor: COLORS.charcoal 
-  },
-  categoryStatText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.silver 
-  },
-  categoryStatTextActive: { 
-    color: COLORS.white 
-  },
+  categoryStatItemActive: {},
+  categoryStatText: { ...TYPOGRAPHY.caption, fontSize: 9 },
+  categoryStatTextActive: { fontWeight: '600' },
 
+  // ACTION BAR
   actionBar: {
     flexDirection: 'row',
-    alignItems: 'center',
     paddingHorizontal: SIZES.lg,
-    marginBottom: SIZES.md,
-    gap: SIZES.sm,
+    paddingBottom: SIZES.md,
+    gap: 6,
+    alignItems: 'center',
   },
   searchContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.porcelain,
-    paddingHorizontal: SIZES.md,
-    paddingVertical: SIZES.sm,
-    gap: SIZES.xs,
+    borderWidth: 0.5,
+    paddingHorizontal: SIZES.sm,
+    paddingVertical: 6,
+    borderRadius: 6,
   },
-  searchInput: { 
-    flex: 1, 
-    ...TYPOGRAPHY.body,
-    fontSize: 13,
-    color: COLORS.charcoal, 
-    padding: 0 
+  searchInput: {
+    flex: 1,
+    marginLeft: 6,
+    fontSize: 12,
+    padding: 0,
   },
+  filterButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 0.5,
+    paddingHorizontal: SIZES.sm,
+    paddingVertical: 6,
+    borderRadius: 6,
+    gap: 4,
+  },
+  filterButtonActive: { borderWidth: 1 },
+  filterButtonText: { fontSize: 9, fontWeight: '500' },
+  filterButtonTextActive: { fontWeight: '700' },
   sortButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    paddingHorizontal: SIZES.md,
-    paddingVertical: SIZES.sm,
     borderWidth: 0.5,
-    borderColor: COLORS.cloud,
+    paddingHorizontal: SIZES.sm,
+    paddingVertical: 6,
+    borderRadius: 6,
     gap: 4,
   },
-  sortButtonText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.charcoal 
-  },
+  sortButtonText: { fontSize: 9, fontWeight: '500' },
 
-  productsList: { 
-    paddingHorizontal: SIZES.lg, 
-    paddingBottom: SIZES.xl 
-  },
-  columnWrapper: { 
-    justifyContent: 'space-between', 
-    marginBottom: SIZES.md 
-  },
+  // PRODUCTS LIST
+  productsList: { paddingHorizontal: SIZES.lg, paddingBottom: SIZES.xl },
+  columnWrapper: { justifyContent: 'space-between', marginBottom: SIZES.md },
+
+  // PRODUCT CARD
   productCard: {
-    width: (width - 48) / 2,
-    backgroundColor: COLORS.white,
+    flex: 1,
+    maxWidth: '48%',
+    borderWidth: 0.5,
+    padding: SIZES.sm,
+    borderRadius: 8,
+  },
+  productImage: { width: '100%', height: 140, borderRadius: 6 },
+  starButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    padding: 4,
     borderRadius: 12,
-    overflow: 'hidden',
-    borderWidth: 0.5,
-    borderColor: COLORS.cloud,
   },
-  productImage: { 
-    width: '100%', 
-    height: 160, 
-    backgroundColor: COLORS.porcelain 
-  },
-  productInfo: { 
-    padding: SIZES.sm 
-  },
-  productName: { 
-    ...TYPOGRAPHY.body,
-    fontSize: 12,
-    fontWeight: '500', 
-    color: COLORS.charcoal, 
-    marginBottom: 1 
-  },
-  productBrand: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 8,
-    color: COLORS.silver, 
-    marginBottom: 4 
-  },
-  productBottom: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center' 
-  },
-  productPrice: { 
-    ...TYPOGRAPHY.body,
-    fontSize: 13,
-    fontWeight: '600', 
-    color: COLORS.cognac 
-  },
-  productSizeBadge: { 
-    backgroundColor: COLORS.porcelain, 
-    paddingHorizontal: 6, 
-    paddingVertical: 1, 
-    borderRadius: 10 
-  },
-  productSizeText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 8, 
-    color: COLORS.silver 
-  },
+  productInfo: { paddingVertical: 4, gap: 2 },
+  productName: { ...TYPOGRAPHY.body, fontSize: 12, fontWeight: '500' },
+  productBrand: { ...TYPOGRAPHY.caption, fontSize: 9 },
+  productColor: { ...TYPOGRAPHY.caption, fontSize: 8 },
+  productBottom: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  productPrice: { ...TYPOGRAPHY.body, fontSize: 13, fontWeight: '600' },
+  productSizeBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  productSizeText: { ...TYPOGRAPHY.caption, fontSize: 7 },
 
-  emptyContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    padding: SIZES.xl 
-  },
-  emptyIconContainer: {
-    width: 80,
-    height: 80,
-    borderWidth: 0.5,
-    borderColor: COLORS.cloud,
+  // EMPTY STATE
+  emptyContainer: {
+    flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SIZES.md,
+    paddingHorizontal: SIZES.xl,
+    paddingTop: 40,
   },
-  emptyTitle: { 
-    ...TYPOGRAPHY.caption,
-    marginTop: SIZES.sm, 
-    marginBottom: 2 
+  emptyIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: SIZES.lg,
   },
-  emptyText: { 
-    ...TYPOGRAPHY.bodySmall,
-    fontSize: 11,
-    textAlign: 'center', 
-    marginBottom: SIZES.lg 
-  },
-  emptyButton: { 
-    backgroundColor: COLORS.charcoal, 
-    paddingHorizontal: SIZES.xl, 
-    paddingVertical: SIZES.sm 
-  },
-  emptyButtonText: { 
-    ...TYPOGRAPHY.button,
-    fontSize: 10,
-    color: COLORS.white 
-  },
-  clearButton: { 
-    backgroundColor: COLORS.charcoal, 
-    paddingHorizontal: SIZES.xl, 
-    paddingVertical: SIZES.sm 
-  },
-  clearButtonText: { 
-    ...TYPOGRAPHY.button,
-    fontSize: 10,
-    color: COLORS.white 
-  },
+  emptyTitle: { ...TYPOGRAPHY.title3, fontSize: 18, fontWeight: '400', letterSpacing: 2, marginBottom: SIZES.xs },
+  emptyText: { ...TYPOGRAPHY.body, fontSize: 13, textAlign: 'center', marginBottom: SIZES.xl, lineHeight: 20 },
+  clearButton: { paddingHorizontal: SIZES.xl, paddingVertical: SIZES.sm, borderRadius: 8 },
+  clearButtonText: { ...TYPOGRAPHY.button, fontSize: 10, fontWeight: '400', letterSpacing: 1 },
+  emptyButton: { paddingHorizontal: SIZES.xl, paddingVertical: SIZES.sm, borderRadius: 8 },
+  emptyButtonText: { ...TYPOGRAPHY.button, fontSize: 10, fontWeight: '400', letterSpacing: 1 },
 
-  modalOverlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.6)', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
+  // MODAL OVERLAY
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.8)', justifyContent: 'center', alignItems: 'center' },
+
+  // MODAL CONTENT
   modalContent: {
-    backgroundColor: COLORS.white,
+    width: width * 0.92,
+    maxHeight: height * 0.9,
     borderRadius: 20,
     padding: SIZES.lg,
-    width: width - 32,
-    maxHeight: height * 0.85,
   },
-  modalHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: SIZES.md 
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: SIZES.md,
+    paddingBottom: SIZES.sm,
+    borderBottomWidth: 0.5,
   },
-  modalTitle: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 14,
-    color: COLORS.charcoal 
-  },
+  modalTitle: { ...TYPOGRAPHY.title3, fontSize: 16, fontWeight: '500' },
+  modalScroll: { maxHeight: height * 0.75 },
 
-  imagePickerContainer: { 
-    alignItems: 'center', 
-    marginBottom: SIZES.md 
-  },
-  imagePickerButton: { 
-    width: '100%', 
-    height: 160, 
-    borderRadius: 12, 
-    overflow: 'hidden', 
-    backgroundColor: COLORS.porcelain 
-  },
-  imagePreview: { 
-    width: '100%', 
-    height: '100%', 
-    resizeMode: 'cover' 
-  },
-  imagePlaceholder: { 
-    width: '100%', 
-    height: '100%', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    gap: 4 
-  },
-  imagePlaceholderText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 10,
-    color: COLORS.silver 
-  },
-  imagePlaceholderSubtext: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 8,
-    color: COLORS.silver 
-  },
-  uploadingOverlay: { 
-    position: 'absolute', 
-    top: 0, 
-    left: 0, 
-    right: 0, 
-    bottom: 0, 
-    backgroundColor: 'rgba(0,0,0,0.5)', 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
-
-  inputGroup: { 
-    marginBottom: SIZES.md 
-  },
-  inputLabel: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.charcoal, 
-    marginBottom: 4 
-  },
+  // INPUTS
+  inputGroup: { marginBottom: SIZES.md },
+  inputLabel: { ...TYPOGRAPHY.caption, fontSize: 10, marginBottom: 4 },
   input: {
     ...TYPOGRAPHY.body,
-    fontSize: 13,
-    backgroundColor: COLORS.porcelain,
+    fontSize: 14,
+    borderWidth: 0.5,
     paddingHorizontal: SIZES.md,
     paddingVertical: SIZES.sm,
-    color: COLORS.charcoal,
+    borderRadius: 8,
   },
+
+  // TEMPLATES
+  templatesSection: { marginBottom: SIZES.md },
+  templatesTitle: { ...TYPOGRAPHY.caption, fontSize: 11, marginBottom: 2 },
+  templatesSubtitle: { ...TYPOGRAPHY.caption, fontSize: 9, marginBottom: 6 },
+  templatesScroll: { flexDirection: 'row' },
+  templateCard: {
+    width: 100,
+    borderWidth: 0.5,
+    borderRadius: 8,
+    padding: SIZES.xs,
+    marginRight: 6,
+  },
+  templateImage: { width: '100%', height: 80, borderRadius: 4 },
+  templateName: { ...TYPOGRAPHY.caption, fontSize: 9, marginTop: 2 },
+  templatePrice: { ...TYPOGRAPHY.caption, fontSize: 8 },
+
+  // IMAGE PICKER
+  imagePickerContainer: { marginBottom: SIZES.md },
+  imagePickerButton: {
+    width: '100%',
+    height: 180,
+    borderRadius: 12,
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 0.5,
+  },
+  imagePreview: { width: '100%', height: '100%' },
+  imageRemoveButton: {
+    position: 'absolute',
+    top: 8,
+    right: 8,
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    padding: 4,
+    borderRadius: 12,
+  },
+  imagePlaceholder: { alignItems: 'center', gap: 4 },
+  imagePlaceholderText: { ...TYPOGRAPHY.caption, fontSize: 12 },
+  imagePlaceholderSubtext: { ...TYPOGRAPHY.caption, fontSize: 10 },
+  uploadingOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  // CATEGORY SELECT
   categorySelect: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: COLORS.white,
-    paddingHorizontal: SIZES.md,
-    paddingVertical: 6,
-    borderRadius: 25,
-    marginRight: SIZES.xs,
+    paddingHorizontal: SIZES.sm,
+    paddingVertical: 4,
     borderWidth: 0.5,
-    borderColor: COLORS.cloud,
+    borderRadius: 16,
+    marginRight: 4,
     gap: 4,
   },
-  categorySelectActive: { 
-    backgroundColor: COLORS.charcoal, 
-    borderColor: COLORS.charcoal 
-  },
-  categorySelectText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.charcoal 
-  },
-  categorySelectTextActive: { 
-    color: COLORS.white 
-  },
-  sizeSelect: {
-    paddingHorizontal: SIZES.md,
-    paddingVertical: 6,
-    borderRadius: 25,
-    backgroundColor: COLORS.white,
-    marginRight: SIZES.xs,
-    borderWidth: 0.5,
-    borderColor: COLORS.cloud,
-  },
-  sizeSelectActive: { 
-    backgroundColor: COLORS.charcoal, 
-    borderColor: COLORS.charcoal 
-  },
-  sizeSelectText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.charcoal 
-  },
-  sizeSelectTextActive: { 
-    color: COLORS.white 
-  },
-  addButton: { 
-    backgroundColor: COLORS.charcoal, 
-    paddingVertical: SIZES.md, 
-    alignItems: 'center', 
-    marginTop: SIZES.sm 
-  },
-  addButtonText: { 
-    ...TYPOGRAPHY.button,
-    fontSize: 10,
-    color: COLORS.white 
-  },
-  saveButton: { 
-    backgroundColor: COLORS.charcoal, 
-    paddingVertical: SIZES.md, 
-    alignItems: 'center', 
-    marginTop: SIZES.sm 
-  },
-  saveButtonText: { 
-    ...TYPOGRAPHY.button,
-    fontSize: 10,
-    color: COLORS.white 
-  },
+  categorySelectActive: { backgroundColor: COLORS.black, borderColor: COLORS.black },
+  categorySelectText: { ...TYPOGRAPHY.caption, fontSize: 9 },
+  categorySelectTextActive: { color: COLORS.white },
 
+  // COLOR SELECT
+  colorSelect: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: SIZES.sm,
+    paddingVertical: 4,
+    borderWidth: 0.5,
+    borderRadius: 16,
+    marginRight: 4,
+    gap: 4,
+  },
+  colorSelectActive: { backgroundColor: COLORS.black, borderColor: COLORS.black },
+  colorSelectText: { ...TYPOGRAPHY.caption, fontSize: 9 },
+  colorSelectTextActive: { color: COLORS.white },
+  colorDot: { width: 12, height: 12, borderRadius: 6 },
+
+  // SIZE SELECT
+  sizeSelect: {
+    paddingHorizontal: SIZES.sm,
+    paddingVertical: 4,
+    borderWidth: 0.5,
+    borderRadius: 16,
+    marginRight: 4,
+  },
+  sizeSelectActive: { backgroundColor: COLORS.black, borderColor: COLORS.black },
+  sizeSelectText: { ...TYPOGRAPHY.caption, fontSize: 9 },
+  sizeSelectTextActive: { color: COLORS.white },
+
+  // ADD BUTTON
+  addButton: { marginTop: SIZES.sm, borderRadius: 8, overflow: 'hidden' },
+  addButtonGradient: { paddingVertical: SIZES.md, alignItems: 'center' },
+  addButtonText: { ...TYPOGRAPHY.button, fontSize: 13, fontWeight: '600', letterSpacing: 1 },
+
+  // EDIT IMAGE
+  editImageContainer: { alignItems: 'center', marginBottom: SIZES.md },
+  editImage: { width: 120, height: 120, borderRadius: 8, borderWidth: 0.5 },
+  editImageLabel: { ...TYPOGRAPHY.caption, fontSize: 9, marginTop: 4 },
+
+  // SAVE BUTTON
+  saveButton: { marginTop: SIZES.sm, borderRadius: 8, overflow: 'hidden' },
+  saveButtonText: { ...TYPOGRAPHY.button, fontSize: 13, fontWeight: '600', letterSpacing: 1 },
+
+  // FILTER MODAL
+  filterModalContainer: { width: width * 0.85, maxHeight: height * 0.7, borderRadius: 20, padding: SIZES.lg },
+  filterModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SIZES.md, paddingBottom: SIZES.sm, borderBottomWidth: 0.5 },
+  filterModalTitle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+  filterBrandItem: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: SIZES.md, borderBottomWidth: 0.5 },
+  filterBrandItemActive: {},
+  filterBrandText: { ...TYPOGRAPHY.body, fontSize: 13 },
+  filterBrandTextActive: { fontWeight: '600' },
+
+  // SORT MODAL
+  sortModalContainer: { width: width * 0.8, borderRadius: 20, padding: SIZES.lg },
+  sortModalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: SIZES.md, paddingBottom: SIZES.sm, borderBottomWidth: 0.5 },
+  sortModalTitle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+  sortOption: { flexDirection: 'row', alignItems: 'center', paddingVertical: SIZES.md, borderBottomWidth: 0.5, gap: SIZES.md },
+  sortOptionActive: {},
+  sortOptionText: { ...TYPOGRAPHY.body, fontSize: 13 },
+  sortOptionTextActive: { fontWeight: '600' },
+
+  // DETAIL MODAL
   detailModalContent: {
-    backgroundColor: COLORS.white,
+    width: width * 0.92,
+    maxHeight: height * 0.9,
     borderRadius: 20,
-    width: width - 32,
     overflow: 'hidden',
   },
-  detailImage: { 
-    width: '100%', 
-    height: 240, 
-    backgroundColor: COLORS.porcelain 
+  detailImage: { width: '100%', height: 300 },
+  detailCloseButton: {
+    position: 'absolute',
+    top: 16,
+    right: 16,
+    padding: 8,
+    borderRadius: 20,
   },
-  detailCloseButton: { 
-    position: 'absolute', 
-    top: SIZES.md, 
-    right: SIZES.md, 
-    backgroundColor: COLORS.charcoal, 
-    padding: 6 
-  },
-  detailInfo: { 
-    padding: SIZES.lg 
-  },
-  detailName: { 
-    ...TYPOGRAPHY.title3,
-    fontSize: 18,
-    color: COLORS.charcoal, 
-    marginBottom: 2 
-  },
-  detailBrand: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 10,
-    color: COLORS.silver, 
-    marginBottom: SIZES.md 
-  },
-  detailMeta: { 
-    flexDirection: 'row', 
-    gap: SIZES.md, 
-    marginBottom: SIZES.md 
-  },
-  detailCategory: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 4 
-  },
-  detailCategoryText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.cognac 
-  },
-  detailSize: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 4 
-  },
-  detailSizeText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.cognac 
-  },
-  detailPrice: { 
-    ...TYPOGRAPHY.title2,
-    fontSize: 22,
-    color: COLORS.cognac, 
-    marginBottom: 4 
-  },
-  detailDate: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 8,
-    color: COLORS.silver, 
-    marginBottom: SIZES.lg 
-  },
-  detailActions: { 
-    flexDirection: 'row', 
-    justifyContent: 'center', 
-    gap: SIZES.md 
-  },
-  editButton: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: COLORS.cognac, 
-    paddingHorizontal: SIZES.xl, 
-    paddingVertical: SIZES.sm, 
-    gap: 4 
-  },
-  editButtonText: { 
-    ...TYPOGRAPHY.button,
-    fontSize: 9,
-    color: COLORS.white 
-  },
-  deleteButton: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    backgroundColor: COLORS.error, 
-    paddingHorizontal: SIZES.xl, 
-    paddingVertical: SIZES.sm, 
-    gap: 4 
-  },
-  deleteButtonText: { 
-    ...TYPOGRAPHY.button,
-    fontSize: 9,
-    color: COLORS.white 
-  },
-
-  sortModalContainer: { 
-    backgroundColor: COLORS.white, 
-    borderRadius: 20, 
-    padding: SIZES.lg, 
-    width: width - 40 
-  },
-  sortModalHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: SIZES.md, 
-    paddingBottom: SIZES.sm, 
-    borderBottomWidth: 0.5, 
-    borderBottomColor: COLORS.cloud 
-  },
-  sortModalTitle: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 14,
-    color: COLORS.charcoal 
-  },
-  sortOption: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    paddingVertical: SIZES.md, 
-    gap: SIZES.md 
-  },
-  sortOptionActive: { 
-    backgroundColor: COLORS.porcelain, 
-    paddingHorizontal: SIZES.sm 
-  },
-  sortOptionText: { 
-    flex: 1, 
-    ...TYPOGRAPHY.body,
-    fontSize: 12,
-    color: COLORS.silver 
-  },
-  sortOptionTextActive: { 
-    color: COLORS.cognac, 
-    fontWeight: '500'
-  },
+  detailInfo: { padding: SIZES.lg },
+  detailHeaderRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 2 },
+  detailName: { ...TYPOGRAPHY.title3, fontSize: 20, fontWeight: '500' },
+  detailBrand: { ...TYPOGRAPHY.body, fontSize: 14, marginBottom: SIZES.md },
+  detailMeta: { gap: 4, marginBottom: SIZES.md },
+  detailCategory: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  detailCategoryText: { ...TYPOGRAPHY.caption, fontSize: 11 },
+  detailColor: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  detailColorText: { ...TYPOGRAPHY.caption, fontSize: 11 },
+  detailSize: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  detailSizeText: { ...TYPOGRAPHY.caption, fontSize: 11 },
+  detailModel: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  detailModelText: { ...TYPOGRAPHY.caption, fontSize: 11 },
+  detailPrice: { ...TYPOGRAPHY.title2, fontSize: 24, fontWeight: '700', marginBottom: 2 },
+  detailDate: { ...TYPOGRAPHY.caption, fontSize: 9, marginBottom: SIZES.md },
+  detailActions: { flexDirection: 'row', gap: SIZES.md },
+  editButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: SIZES.md, borderRadius: 8 },
+  editButtonText: { ...TYPOGRAPHY.button, fontSize: 11, fontWeight: '600' },
+  deleteButton: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, paddingVertical: SIZES.md, borderRadius: 8 },
+  deleteButtonText: { ...TYPOGRAPHY.button, fontSize: 11, fontWeight: '600' },
 });
 
 export default KoleksiyonumScreen;

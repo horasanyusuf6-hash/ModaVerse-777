@@ -1,4 +1,5 @@
-// 📁 src/screens/CartScreen.js - TAM REVİZE (Backend Entegre)
+// 📁 src/screens/CartScreen.js - REVİZE (Premium Kart Eklendi)
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -17,6 +18,11 @@ import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { COLORS, TYPOGRAPHY, SIZES } from '../constants/Theme';
 import { auth } from '../config/firebase';
+
+// ============================================================
+// 📌 TOAST İMPORTU
+// ============================================================
+import { showToast } from '../components/CustomAlert';
 
 const { width } = Dimensions.get('window');
 
@@ -66,17 +72,6 @@ const updateCartItem = async (itemId, newQuantity) => {
   }
 };
 
-// Sepeti temizle
-const clearCart = async () => {
-  try {
-    await AsyncStorage.setItem('@cart', JSON.stringify([]));
-    return true;
-  } catch (error) {
-    console.error('Sepet temizleme hatası:', error);
-    return false;
-  }
-};
-
 // ============================================================
 // 📌 ANA BİLEŞEN
 // ============================================================
@@ -121,9 +116,32 @@ const CartScreen = ({ navigation }) => {
   }, []);
 
   // ============================================================
+  // 📌 HEADER'DAKİ GERİ BUTONUNU KALDIR
+  // ============================================================
+  useEffect(() => {
+    navigation.setOptions({
+      headerLeft: null,
+      headerShown: true,
+      title: 'SEPETİM',
+      headerStyle: {
+        backgroundColor: COLORS.white,
+      },
+      headerTitleStyle: {
+        ...TYPOGRAPHY.caption,
+        fontSize: 12,
+        letterSpacing: 1,
+        fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+      },
+      headerTintColor: COLORS.black,
+    });
+  }, [navigation]);
+
+  // ============================================================
   // 📌 HANDLERS
   // ============================================================
   const handleRemoveItem = async (itemId) => {
+    const item = cartItems.find(i => i.id === itemId);
+    
     Alert.alert(
       'Ürünü Kaldır',
       'Bu ürünü sepetten kaldırmak istediğinize emin misiniz?',
@@ -136,6 +154,13 @@ const CartScreen = ({ navigation }) => {
             const success = await removeFromCart(itemId);
             if (success) {
               await loadCart();
+              showToast({
+                title: '🗑️ Ürün Kaldırıldı',
+                message: `${item?.ad || item?.name || 'Ürün'} sepetten kaldırıldı.`,
+                type: 'info',
+                autoClose: true,
+                autoCloseDelay: 2000,
+              });
             }
           }
         }
@@ -153,21 +178,34 @@ const CartScreen = ({ navigation }) => {
 
   const handleCheckout = () => {
     if (cartItems.length === 0) {
-      Alert.alert('Uyarı', 'Sepetiniz boş!');
+      showToast({
+        title: 'Uyarı',
+        message: 'Sepetiniz boş! Alışverişe başlamak ister misin?',
+        type: 'warning',
+        autoClose: true,
+        autoCloseDelay: 2500,
+      });
       return;
     }
     
     if (!user) {
-      Alert.alert(
-        'Giriş Yapın',
-        'Ödeme işlemi için lütfen giriş yapın.',
-        [
-          { text: 'İptal', style: 'cancel' },
-          { text: 'Giriş Yap', onPress: () => navigation.navigate('Auth') }
-        ]
-      );
+      showToast({
+        title: 'Giriş Yapın',
+        message: 'Ödeme işlemi için lütfen giriş yapın.',
+        type: 'warning',
+        autoClose: true,
+        autoCloseDelay: 2500,
+      });
       return;
     }
+    
+    showToast({
+      title: '💳 Ödemeye Geçiliyor',
+      message: 'Siparişiniz hazırlanıyor. Güvenli ödeme ekranına yönlendiriliyorsunuz.',
+      type: 'success',
+      autoClose: false,
+      showPremium: true,
+    });
     
     navigation.navigate('Checkout');
   };
@@ -189,17 +227,17 @@ const CartScreen = ({ navigation }) => {
         <Image source={{ uri: productImage }} style={styles.itemImage} />
         
         <View style={styles.itemInfo}>
-          <Text style={styles.itemBrand}>{productBrand}</Text>
-          <Text style={styles.itemName} numberOfLines={2}>{productName}</Text>
+          <Text style={[styles.itemBrand, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{productBrand}</Text>
+          <Text style={[styles.itemName, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]} numberOfLines={2}>{productName}</Text>
           
           <View style={styles.itemDetails}>
-            <Text style={styles.itemDetail}>{productSize}</Text>
-            <Text style={styles.itemDetail}>•</Text>
-            <Text style={styles.itemDetail}>{productColor}</Text>
+            <Text style={[styles.itemDetail, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{productSize}</Text>
+            <Text style={[styles.itemDetail, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>•</Text>
+            <Text style={[styles.itemDetail, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{productColor}</Text>
           </View>
           
           <View style={styles.itemBottom}>
-            <Text style={styles.itemPrice}>₺{productPrice}</Text>
+            <Text style={[styles.itemPrice, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>₺{productPrice}</Text>
             
             <View style={styles.quantityContainer}>
               <TouchableOpacity 
@@ -209,7 +247,7 @@ const CartScreen = ({ navigation }) => {
                 <Ionicons name="remove" size={14} color={COLORS.black} />
               </TouchableOpacity>
               
-              <Text style={styles.quantityText}>{quantity}</Text>
+              <Text style={[styles.quantityText, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>{quantity}</Text>
               
               <TouchableOpacity 
                 style={styles.quantityButton}
@@ -231,18 +269,30 @@ const CartScreen = ({ navigation }) => {
     );
   };
 
+  // ============================================================
+  // 📌 EMPTY STATE - REVİZE (Premium Kart Eklendi)
+  // ============================================================
   const renderEmpty = () => (
     <View style={styles.emptyContainer}>
       <View style={styles.emptyIconContainer}>
         <Ionicons name="cart-outline" size={48} color={COLORS.grayLight} />
       </View>
-      <Text style={styles.emptyTitle}>SEPETİN BOŞ</Text>
-      <Text style={styles.emptyText}>Alışverişe başlamak için mağazayı keşfet!</Text>
+      <Text style={[styles.emptyTitle, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>SEPETİN BOŞ</Text>
+      <Text style={[styles.emptyText, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>Alışverişe başlamak için mağazayı keşfet!</Text>
       <TouchableOpacity 
         style={styles.emptyButton}
-        onPress={() => navigation?.goBack()}
+        onPress={() => {
+          showToast({
+            title: '🛍️ Alışverişe Başla',
+            message: 'Senin için en iyi ürünleri keşfetmeye hazır mısın?',
+            type: 'success',
+            autoClose: false,
+            showPremium: true,
+          });
+          navigation.navigate('Vitrinim', { initialTab: 'shop' });
+        }}
       >
-        <Text style={styles.emptyButtonText}>ALIŞVERİŞE BAŞLA</Text>
+        <Text style={[styles.emptyButtonText, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>ALIŞVERİŞE BAŞLA</Text>
       </TouchableOpacity>
     </View>
   );
@@ -250,8 +300,8 @@ const CartScreen = ({ navigation }) => {
   const renderFooter = () => (
     <View style={styles.footer}>
       <View style={styles.totalRow}>
-        <Text style={styles.totalLabel}>TOPLAM</Text>
-        <Text style={styles.totalPrice}>₺{totalPrice}</Text>
+        <Text style={[styles.totalLabel, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>TOPLAM</Text>
+        <Text style={[styles.totalPrice, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>₺{totalPrice}</Text>
       </View>
       
       <TouchableOpacity 
@@ -259,7 +309,7 @@ const CartScreen = ({ navigation }) => {
         disabled={cartItems.length === 0}
         onPress={handleCheckout}
       >
-        <Text style={styles.checkoutButtonText}>ÖDEMEYE GEÇ</Text>
+        <Text style={[styles.checkoutButtonText, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>ÖDEMEYE GEÇ</Text>
         <Ionicons name="arrow-forward" size={18} color={COLORS.white} />
       </TouchableOpacity>
     </View>
@@ -274,7 +324,7 @@ const CartScreen = ({ navigation }) => {
         <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
         <View style={styles.loadingContainer}>
           <ActivityIndicator size="large" color={COLORS.black} />
-          <Text style={styles.loadingText}>YÜKLENİYOR...</Text>
+          <Text style={[styles.loadingText, { fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif' }]}>YÜKLENİYOR...</Text>
         </View>
       </SafeAreaView>
     );
@@ -284,16 +334,6 @@ const CartScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
       
-      <View style={styles.header}>
-        <TouchableOpacity onPress={() => navigation?.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={COLORS.black} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>SEPETİM</Text>
-        <TouchableOpacity onPress={loadCart} style={styles.refreshButton}>
-          <Ionicons name="refresh-outline" size={20} color={COLORS.black} />
-        </TouchableOpacity>
-      </View>
-
       <FlatList
         data={cartItems}
         renderItem={renderItem}
@@ -315,20 +355,6 @@ const styles = StyleSheet.create({
   loadingContainer: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: SIZES.md },
   loadingText: { ...TYPOGRAPHY.caption, color: COLORS.grayMedium },
 
-  // HEADER
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    borderBottomWidth: 0.5,
-    borderBottomColor: '#F0F0F0',
-  },
-  backButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  refreshButton: { width: 40, height: 40, justifyContent: 'center', alignItems: 'center' },
-  headerTitle: { ...TYPOGRAPHY.title3, fontSize: 17, fontWeight: '600', letterSpacing: 1 },
-  
   // LIST
   listContent: { paddingHorizontal: 16, paddingBottom: 20 },
   

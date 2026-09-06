@@ -1,452 +1,544 @@
-// src/services/api.js
-// ModaVerse AI - Backend API Servisi (Oracle Bağlantılı)
-// Versiyon: 2.0.0 - REVİZE
+// 📁 src/services/api.js - REVİZE (Backend entegrasyonlu)
 
-import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ============================================================
-// 📱 PLATFORM BAZLI API URL
+// 📌 API YAPILANDIRMASI
 // ============================================================
 
-const getBaseUrl = () => {
-  // ✅ ORACLE SUNUCUSU (Her zaman aynı)
-  const PROD_URL = 'http://130.61.118.228:8080';
+// Backend URL (Oracle Sunucu)
+export const API_URL = 'http://130.61.118.228:8080';
+
+// API Endpoint'leri
+export const ENDPOINTS = {
+  // Auth
+  AUTH_REGISTER: '/api/auth/register',
+  AUTH_LOGIN: '/api/auth/login',
+  AUTH_ME: '/api/auth/me',
+  AUTH_TEST: '/api/auth/test',
+  AUTH_LOGOUT: '/api/auth/logout',
   
-  if (__DEV__) {
-    // Geliştirme ortamında - Oracle IP'ye bağlan
-    return PROD_URL;
-  }
+  // User Profile
+  USER_ME: '/api/users/me',
+  USER_UPDATE: '/api/users/update',
+  USER_DELETE: '/api/users/delete',
+  USER_STATS: (userId) => `/api/users/stats/${userId}`,
   
-  // Production'da aynı URL
-  return PROD_URL;
+  // Wardrobe
+  WARDROBE_LIST: (userId) => `/api/wardrobe/list/${userId}`,
+  WARDROBE_ADD: '/api/wardrobe/add',
+  WARDROBE_DELETE: (itemId) => `/api/wardrobe/delete/${itemId}`,
+  WARDROBE_UPDATE: (itemId) => `/api/wardrobe/update/${itemId}`,
+  WARDROBE_STAR: '/api/wardrobe/update-star',
+  WARDROBE_STATS: (userId) => `/api/wardrobe/stats/${userId}`,
+  
+  // Outfit Suggestions
+  OUTFIT_SUGGEST: '/api/outfit-suggest',
+  OUTFIT_WEATHER: '/api/outfit-weather',
+  SUGGEST_TURN1: '/api/suggest/turn1',
+  SUGGEST_TURN2: '/api/suggest/turn2',
+  SUGGEST_TURN3: '/api/suggest/turn3',
+  
+  // Chat
+  CHAT: '/api/chat',
+  
+  // Karar Şefi
+  SEF_KONUS: '/api/sef/konus',
+  SEF_BILGI: '/api/sef/bilgi',
+  
+  // Community
+  COMMUNITY_SHARE: '/api/community/share',
+  COMMUNITY_FEED: '/api/community/feed',
+  COMMUNITY_LIKE: '/api/community/like',
+  COMMUNITY_CATEGORIES: '/api/community/categories',
+  
+  // Analyze
+  ANALYZE: '/api/analyze',
+  
+  // Color & Category
+  COLOR_CHECK: '/api/color-check',
+  CATEGORY_CHECK: '/api/category-check',
+  
+  // Depo
+  DEPO_URUNLER: '/api/depo/urunler',
+  DEPO_URUN: (urunId) => `/api/depo/urun/${urunId}`,
+  DEPO_URUN_ARA: '/api/depo/urun-ara',
+  
+  // System
+  HEALTH: '/health',
+  SYSTEM_STATUS: '/api/durum',
 };
 
-const API_BASE_URL = getBaseUrl();
-
-console.log(`🌐 API Base URL: ${API_BASE_URL}`);
-
 // ============================================================
-// 📦 AXIOS CLIENT
+// 📌 API SINIFI
 // ============================================================
 
-const api = axios.create({
-  baseURL: API_BASE_URL,
-  timeout: 15000, // 15 saniye
-  headers: {
-    'Content-Type': 'application/json',
-    'Accept': 'application/json',
-  },
-});
-
-// ============================================================
-// 🔑 TOKEN YÖNETİMİ
-// ============================================================
-
-const getToken = async () => {
-  try {
-    const token = await AsyncStorage.getItem('modaverse_token');
-    return token;
-  } catch (error) {
-    console.error('Token alınamadı:', error);
-    return null;
+class ApiService {
+  constructor() {
+    this.baseUrl = API_URL;
+    this.token = null;
   }
-};
 
-// ============================================================
-// 📡 REQUEST INTERCEPTOR (Her istekten önce)
-// ============================================================
-
-api.interceptors.request.use(
-  async (config) => {
-    // Token ekle
-    const token = await getToken();
+  /**
+   * Token'ı ayarla
+   */
+  setToken(token) {
+    this.token = token;
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    }
-    
-    console.log(`📡 API İsteği: ${config.method?.toUpperCase()} ${config.url}`);
-    return config;
-  },
-  (error) => {
-    console.error('❌ API İstek Hatası:', error);
-    return Promise.reject(error);
-  }
-);
-
-// ============================================================
-// 📡 RESPONSE INTERCEPTOR (Her cevaptan sonra)
-// ============================================================
-
-api.interceptors.response.use(
-  (response) => {
-    console.log(`✅ API Yanıt: ${response.status} ${response.config.url}`);
-    return response;
-  },
-  async (error) => {
-    if (error.response) {
-      // Sunucu yanıt verdi (4xx, 5xx)
-      console.error('❌ API Yanıt Hatası:', {
-        status: error.response.status,
-        data: error.response.data,
-        url: error.config?.url,
-      });
-      
-      // 🔥 Özel hata mesajları
-      switch (error.response.status) {
-        case 401:
-          // Yetkisiz - Token geçersiz
-          console.warn('⚠️ Token geçersiz, çıkış yapılıyor...');
-          await AsyncStorage.removeItem('modaverse_token');
-          await AsyncStorage.removeItem('modaverse_user');
-          // Navigation yönlendirmesi App.js'de yapılacak
-          break;
-        case 404:
-          console.error('❌ Kaynak bulunamadı');
-          break;
-        case 429:
-          console.error('⚠️ Çok fazla istek, lütfen bekleyin');
-          break;
-        case 500:
-          console.error('❌ Sunucu hatası');
-          break;
-      }
-    } else if (error.request) {
-      // İstek yapıldı ama cevap alınamadı (timeout / bağlantı hatası)
-      console.error('❌ Sunucuya ulaşılamıyor:', error.message);
+      AsyncStorage.setItem('@auth_token', token);
     } else {
-      // İstek oluşturulurken hata
-      console.error('❌ İstek oluşturma hatası:', error.message);
+      AsyncStorage.removeItem('@auth_token');
     }
-    
-    return Promise.reject(error);
   }
-);
+
+  /**
+   * Token'ı yükle
+   */
+  async loadToken() {
+    try {
+      const token = await AsyncStorage.getItem('@auth_token');
+      if (token) {
+        this.token = token;
+      }
+      return token;
+    } catch (error) {
+      console.error('Token yükleme hatası:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Headers oluştur
+   */
+  getHeaders(includeAuth = true) {
+    const headers = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+
+    if (includeAuth && this.token) {
+      headers['Authorization'] = `Bearer ${this.token}`;
+    }
+
+    return headers;
+  }
+
+  /**
+   * GET isteği
+   */
+  async get(endpoint, includeAuth = true) {
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'GET',
+        headers: this.getHeaders(includeAuth),
+      });
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`GET ${endpoint} hatası:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * POST isteği
+   */
+  async post(endpoint, body, includeAuth = true) {
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'POST',
+        headers: this.getHeaders(includeAuth),
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`POST ${endpoint} hatası:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * PUT isteği
+   */
+  async put(endpoint, body, includeAuth = true) {
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'PUT',
+        headers: this.getHeaders(includeAuth),
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`PUT ${endpoint} hatası:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * DELETE isteği
+   */
+  async delete(endpoint, includeAuth = true) {
+    try {
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'DELETE',
+        headers: this.getHeaders(includeAuth),
+      });
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`DELETE ${endpoint} hatası:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Dosya yükleme (multipart/form-data)
+   */
+  async upload(endpoint, formData, includeAuth = true) {
+    try {
+      const headers = {
+        'Accept': 'application/json',
+      };
+
+      if (includeAuth && this.token) {
+        headers['Authorization'] = `Bearer ${this.token}`;
+      }
+
+      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        method: 'POST',
+        headers: headers,
+        body: formData,
+      });
+
+      const data = await response.json();
+      return data;
+    } catch (error) {
+      console.error(`UPLOAD ${endpoint} hatası:`, error);
+      throw error;
+    }
+  }
+}
 
 // ============================================================
-// 🔐 AUTH API
+// 📌 AUTH API
 // ============================================================
 
 export const authAPI = {
-  login: async (email, password) => {
-    try {
-      const response = await api.post('/api/auth/login', { email, password });
-      return response.data;
-    } catch (error) {
-      console.error('Login hatası:', error);
-      throw error;
-    }
-  },
-
+  /**
+   * Kullanıcı kaydı
+   */
   register: async (email, password, displayName) => {
-    try {
-      const response = await api.post('/api/auth/register', {
-        email,
-        password,
-        display_name: displayName
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Register hatası:', error);
-      throw error;
-    }
+    return api.post(ENDPOINTS.AUTH_REGISTER, {
+      email,
+      password,
+      display_name: displayName,
+    }, false);
   },
 
-  getProfile: async () => {
-    try {
-      const response = await api.get('/api/auth/me');
-      return response.data;
-    } catch (error) {
-      console.error('Profil hatası:', error);
-      throw error;
+  /**
+   * Kullanıcı girişi
+   */
+  login: async (email, password) => {
+    const response = await api.post(ENDPOINTS.AUTH_LOGIN, {
+      email,
+      password,
+    }, false);
+
+    if (response.success && response.id_token) {
+      api.setToken(response.id_token);
     }
+
+    return response;
   },
 
+  /**
+   * Mevcut kullanıcı bilgileri
+   */
+  getCurrentUser: async () => {
+    return api.get(ENDPOINTS.AUTH_ME);
+  },
+
+  /**
+   * Token testi
+   */
+  testToken: async () => {
+    return api.get(ENDPOINTS.AUTH_TEST);
+  },
+
+  /**
+   * Çıkış yap
+   */
   logout: async () => {
-    try {
-      await AsyncStorage.removeItem('modaverse_token');
-      await AsyncStorage.removeItem('modaverse_user');
-      return { success: true };
-    } catch (error) {
-      console.error('Logout hatası:', error);
-      throw error;
-    }
-  }
+    api.setToken(null);
+    return { success: true };
+  },
 };
 
 // ============================================================
-// 👕 WARDIROBE API
+// 📌 USER API
+// ============================================================
+
+export const userAPI = {
+  /**
+   * Kullanıcı profilini getir
+   */
+  getProfile: async () => {
+    return api.get(ENDPOINTS.USER_ME);
+  },
+
+  /**
+   * Kullanıcı profilini güncelle
+   */
+  updateProfile: async (displayName, photoUrl) => {
+    return api.put(ENDPOINTS.USER_UPDATE, {
+      display_name: displayName,
+      photo_url: photoUrl,
+    });
+  },
+
+  /**
+   * Kullanıcı hesabını sil
+   */
+  deleteAccount: async () => {
+    return api.delete(ENDPOINTS.USER_DELETE);
+  },
+
+  /**
+   * Kullanıcı istatistikleri
+   */
+  getStats: async (userId) => {
+    return api.get(ENDPOINTS.USER_STATS(userId));
+  },
+};
+
+// ============================================================
+// 📌 WARDROBE API
 // ============================================================
 
 export const wardrobeAPI = {
-  // Tüm ürünleri getir
-  getAllItems: async (userId) => {
-    try {
-      const response = await api.get(`/api/wardrobe/list/${userId}`);
-      return response.data;
-    } catch (error) {
-      console.error('getAllItems hatası:', error);
-      throw error;
-    }
+  /**
+   * Gardırop listesini getir
+   */
+  getItems: async (userId) => {
+    return api.get(ENDPOINTS.WARDROBE_LIST(userId));
   },
 
-  // Yeni ürün ekle
+  /**
+   * Gardıropa ürün ekle
+   */
   addItem: async (data) => {
-    try {
-      const response = await api.post('/api/wardrobe/add', data);
-      return response.data;
-    } catch (error) {
-      console.error('addItem hatası:', error);
-      throw error;
-    }
+    return api.post(ENDPOINTS.WARDROBE_ADD, data);
   },
 
-  // Ürün sil
+  /**
+   * Gardıroptan ürün sil
+   */
   deleteItem: async (itemId, userId) => {
-    try {
-      const response = await api.delete(`/api/wardrobe/delete/${itemId}`, {
-        params: { user_id: userId }
-      });
-      return response.data;
-    } catch (error) {
-      console.error(`deleteItem hatası (${itemId}):`, error);
-      throw error;
-    }
+    return api.delete(`${ENDPOINTS.WARDROBE_DELETE(itemId)}?user_id=${userId}`);
   },
 
-  // Star parça işaretle
+  /**
+   * Gardırop öğesini güncelle
+   */
+  updateItem: async (itemId, data) => {
+    return api.put(ENDPOINTS.WARDROBE_UPDATE(itemId), data);
+  },
+
+  /**
+   * Star işaretle
+   */
   toggleStar: async (userId, productId, isStar) => {
-    try {
-      const response = await api.post('/api/wardrobe/update-star', {
-        user_id: userId,
-        product_id: productId,
-        is_star: isStar
-      });
-      return response.data;
-    } catch (error) {
-      console.error('toggleStar hatası:', error);
-      throw error;
-    }
+    return api.post(ENDPOINTS.WARDROBE_STAR, {
+      user_id: userId,
+      product_id: productId,
+      is_star: isStar,
+    });
   },
 
-  // Gardırop istatistikleri
+  /**
+   * Gardırop istatistikleri
+   */
   getStats: async (userId) => {
-    try {
-      const response = await api.get(`/api/wardrobe/stats/${userId}`);
-      return response.data;
-    } catch (error) {
-      console.error('getStats hatası:', error);
-      throw error;
-    }
-  }
+    return api.get(ENDPOINTS.WARDROBE_STATS(userId));
+  },
 };
 
 // ============================================================
-// 🧠 AI / KARAR ŞEFİ API
-// ============================================================
-
-export const sefAPI = {
-  // Karar Şefi'ne soru sor
-  ask: async (question, userId = null) => {
-    try {
-      const response = await api.post('/api/sef/konus', {
-        soru: question,
-        user_id: userId
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Sef API hatası:', error);
-      throw error;
-    }
-  },
-
-  // Kombin önerisi al
-  getOutfitSuggestion: async (userId) => {
-    try {
-      const response = await api.post('/api/karar/konus', {
-        user_id: userId
-      });
-      return response.data;
-    } catch (error) {
-      console.error('Kombin önerisi hatası:', error);
-      throw error;
-    }
-  },
-
-  // Turn1 - Tüm kombinler
-  getTurn1Outfits: async (items) => {
-    try {
-      const response = await api.post('/api/suggest/turn1', { items });
-      return response.data;
-    } catch (error) {
-      console.error('Turn1 hatası:', error);
-      throw error;
-    }
-  },
-
-  // Turn2 - Star parçalı kombinler
-  getTurn2Outfits: async (items, starItems) => {
-    try {
-      const response = await api.post('/api/suggest/turn2', { items, star_items: starItems });
-      return response.data;
-    } catch (error) {
-      console.error('Turn2 hatası:', error);
-      throw error;
-    }
-  },
-
-  // Turn3 - Zaman bazlı kombinler
-  getTurn3Outfits: async (items, timeOfDay) => {
-    try {
-      const response = await api.post('/api/suggest/turn3', { items, time_of_day: timeOfDay });
-      return response.data;
-    } catch (error) {
-      console.error('Turn3 hatası:', error);
-      throw error;
-    }
-  }
-};
-
-// ============================================================
-// 👔 OUTFIT API
+// 📌 OUTFIT API
 // ============================================================
 
 export const outfitAPI = {
-  // Kombin oluştur
-  createOutfit: async (data) => {
-    try {
-      const response = await api.post('/api/community/share', data);
-      return response.data;
-    } catch (error) {
-      console.error('createOutfit hatası:', error);
-      throw error;
-    }
+  /**
+   * Kombin önerisi al
+   */
+  suggest: async (items) => {
+    return api.post(ENDPOINTS.OUTFIT_SUGGEST, { items });
   },
 
-  // Topluluk akışı
+  /**
+   * Hava durumuna göre kombin
+   */
+  suggestWithWeather: async (items, city = 'istanbul') => {
+    return api.post(ENDPOINTS.OUTFIT_WEATHER, { items, city });
+  },
+
+  /**
+   * 1.Tur: Tüm kombinler
+   */
+  turn1: async (items) => {
+    return api.post(ENDPOINTS.SUGGEST_TURN1, { items });
+  },
+
+  /**
+   * 2.Tur: Star kombinler
+   */
+  turn2: async (items, starItems) => {
+    return api.post(ENDPOINTS.SUGGEST_TURN2, { items, star_items: starItems });
+  },
+
+  /**
+   * 3.Tur: Zaman bazlı kombin
+   */
+  turn3: async (items, timeOfDay) => {
+    return api.post(ENDPOINTS.SUGGEST_TURN3, { items, time_of_day: timeOfDay });
+  },
+};
+
+// ============================================================
+// 📌 CHAT API
+// ============================================================
+
+export const chatAPI = {
+  /**
+   * AI ile sohbet
+   */
+  chat: async (message, items = [], city = null) => {
+    return api.post(ENDPOINTS.CHAT, { message, items, city });
+  },
+};
+
+// ============================================================
+// 📌 SEF API
+// ============================================================
+
+export const sefAPI = {
+  /**
+   * Karar Şefi ile konuş
+   */
+  konus: async (soru, userId = null) => {
+    return api.post(ENDPOINTS.SEF_KONUS, { soru, user_id: userId });
+  },
+
+  /**
+   * Şef bilgileri
+   */
+  getBilgi: async () => {
+    return api.get(ENDPOINTS.SEF_BILGI);
+  },
+};
+
+// ============================================================
+// 📌 COMMUNITY API
+// ============================================================
+
+export const communityAPI = {
+  /**
+   * Kombin paylaş
+   */
+  share: async (data) => {
+    return api.post(ENDPOINTS.COMMUNITY_SHARE, data);
+  },
+
+  /**
+   * Feed'i getir
+   */
   getFeed: async (concept = null, page = 1, limit = 20) => {
-    try {
-      const response = await api.get('/api/community/feed', {
-        params: { concept, page, limit }
-      });
-      return response.data;
-    } catch (error) {
-      console.error('getFeed hatası:', error);
-      throw error;
+    let url = `${ENDPOINTS.COMMUNITY_FEED}?page=${page}&limit=${limit}`;
+    if (concept) {
+      url += `&concept=${encodeURIComponent(concept)}`;
     }
+    return api.get(url);
   },
 
-  // Beğeni
-  likePost: async (postId, userId, likeType) => {
-    try {
-      const response = await api.post('/api/community/like', {
-        post_id: postId,
-        user_id: userId,
-        like_type: likeType
-      });
-      return response.data;
-    } catch (error) {
-      console.error('likePost hatası:', error);
-      throw error;
-    }
+  /**
+   * Beğen
+   */
+  like: async (userId, postId, likeType) => {
+    return api.post(ENDPOINTS.COMMUNITY_LIKE, {
+      user_id: userId,
+      post_id: postId,
+      like_type: likeType,
+    });
   },
 
-  // Kategoriler
+  /**
+   * Kategorileri getir
+   */
   getCategories: async () => {
-    try {
-      const response = await api.get('/api/community/categories');
-      return response.data;
-    } catch (error) {
-      console.error('getCategories hatası:', error);
-      throw error;
-    }
-  }
+    return api.get(ENDPOINTS.COMMUNITY_CATEGORIES);
+  },
 };
 
 // ============================================================
-// 🖼️ ANALYZE API
+// 📌 DEPO API
 // ============================================================
 
-export const analyzeAPI = {
-  // Görsel analiz
-  analyzeImage: async (formData) => {
-    try {
-      const response = await api.post('/api/analyze', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
-      });
-      return response.data;
-    } catch (error) {
-      console.error('analyzeImage hatası:', error);
-      throw error;
-    }
+export const depoAPI = {
+  /**
+   * Tüm ürünleri getir
+   */
+  getUrunler: async () => {
+    return api.get(ENDPOINTS.DEPO_URUNLER);
   },
 
-  // Renk kontrolü
-  checkColor: async (color1, color2) => {
-    try {
-      const response = await api.post('/api/color-check', { color1, color2 });
-      return response.data;
-    } catch (error) {
-      console.error('checkColor hatası:', error);
-      throw error;
-    }
+  /**
+   * Ürün detayı
+   */
+  getUrun: async (urunId) => {
+    return api.get(ENDPOINTS.DEPO_URUN(urunId));
   },
 
-  // Kategori kontrolü
-  checkCategory: async (category1, category2) => {
-    try {
-      const response = await api.post('/api/category-check', { category1, category2 });
-      return response.data;
-    } catch (error) {
-      console.error('checkCategory hatası:', error);
-      throw error;
-    }
-  }
+  /**
+   * Ürün ara
+   */
+  searchUrun: async (filtre) => {
+    return api.post(ENDPOINTS.DEPO_URUN_ARA, filtre);
+  },
 };
 
 // ============================================================
-// ⚙️ SYSTEM API
+// 📌 SYSTEM API
 // ============================================================
 
 export const systemAPI = {
-  // Health check
-  healthCheck: async () => {
-    try {
-      const response = await api.get('/health');
-      return response.data;
-    } catch (error) {
-      console.error('Health check hatası:', error);
-      throw error;
-    }
+  /**
+   * Health check
+   */
+  health: async () => {
+    return api.get(ENDPOINTS.HEALTH, false);
   },
 
-  // Sistem durumu
+  /**
+   * Sistem durumu
+   */
   getStatus: async () => {
-    try {
-      const response = await api.get('/api/durum');
-      return response.data;
-    } catch (error) {
-      console.error('Sistem durumu hatası:', error);
-      throw error;
-    }
+    return api.get(ENDPOINTS.SYSTEM_STATUS);
   },
-
-  // Worker durumu
-  getWorkerStatus: async () => {
-    try {
-      const response = await api.get('/api/worker/durum');
-      return response.data;
-    } catch (error) {
-      console.error('Worker durumu hatası:', error);
-      throw error;
-    }
-  }
 };
 
 // ============================================================
-// 📤 EXPORT
+// 📌 SINGLETON INSTANCE
 // ============================================================
+
+export const api = new ApiService();
+
+// Başlangıçta token'ı yükle
+api.loadToken();
 
 export default api;

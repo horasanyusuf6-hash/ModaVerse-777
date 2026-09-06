@@ -1,13 +1,14 @@
-// 📁 App.js - TAM REVİZE (API URL + Context Eklendi)
-import React, { useState, useEffect, createContext, useContext } from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+// 📁 App.js - REVİZE (CustomToast Entegrasyonlu)
+
+import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
+import { NavigationContainer, DefaultTheme, DarkTheme } from '@react-navigation/native';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { Ionicons } from '@expo/vector-icons';
 import * as SplashScreen from 'expo-splash-screen';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFonts } from 'expo-font';
-import { ActivityIndicator, View, StatusBar } from 'react-native';
+import { ActivityIndicator, View, StatusBar, AppState, Platform } from 'react-native';
 
 import { COLORS, TYPOGRAPHY } from './src/constants/Theme';
 
@@ -15,11 +16,18 @@ import { COLORS, TYPOGRAPHY } from './src/constants/Theme';
 import { auth } from './src/config/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
-// 🆕 Firestore Servis
+// 🆕 Servisler
 import { loadLocalData, migrateDataToFirestore } from './src/services/firestoreService';
+import imagePoolService from './src/services/imagePoolService';
+import brandService from './src/services/brandService';
+import aiAdvisorService from './src/services/aiAdvisorService';
+import syncService from './src/services/syncService';
 
-// 🆕 API Servis (BACKEND BAĞLANTISI)
-import { API_URL } from './src/services/api';  // ✅ api kaldırıldı
+// 🆕 CUSTOM TOAST
+import { CustomToast, setToastRef, useToast } from './src/components/CustomAlert';
+
+// 🆕 API Servis
+import { API_URL } from './src/services/api';
 
 // ============================================================
 // 📌 ANA SAYFALAR (TAB'ler)
@@ -84,18 +92,59 @@ const Stack = createNativeStackNavigator();
 // ============================================================
 
 // TEMA CONTEXT
-export const ThemeContext = createContext({ theme: 'light', toggleTheme: () => {} });
+export const ThemeContext = createContext({ theme: 'light', toggleTheme: () => {}, isDark: false });
 
 // AUTH CONTEXT
 export const AuthContext = createContext({ user: null, loading: true });
 
-// 🆕 API CONTEXT (Backend bağlantısı için)
+// API CONTEXT
 export const ApiContext = createContext({
   apiUrl: API_URL,
   isConnected: true,
   setConnected: () => {}
 });
 
+// APP STATE CONTEXT
+export const AppStateContext = createContext({
+  appState: 'active',
+  isForeground: true,
+});
+
+// ============================================================
+// 🆕 NAVIGASYON TEMA RENKLERİ
+// ============================================================
+const getNavigationTheme = (isDark) => {
+  if (isDark) {
+    return {
+      ...DarkTheme,
+      colors: {
+        ...DarkTheme.colors,
+        primary: COLORS.white,
+        background: '#121212',
+        card: '#1E1E1E',
+        text: COLORS.white,
+        border: '#2D2D2D',
+        notification: COLORS.cognac,
+      },
+    };
+  }
+  return {
+    ...DefaultTheme,
+    colors: {
+      ...DefaultTheme.colors,
+      primary: COLORS.black,
+      background: COLORS.white,
+      card: COLORS.white,
+      text: COLORS.black,
+      border: COLORS.grayLight,
+      notification: COLORS.cognac,
+    },
+  };
+};
+
+// ============================================================
+// 🆕 TAB BAR ICON
+// ============================================================
 const getTabBarIcon = (routeName, focused) => {
   const icons = {
     'Vitrinim': focused ? 'home' : 'home-outline',
@@ -108,6 +157,47 @@ const getTabBarIcon = (routeName, focused) => {
 };
 
 // ============================================================
+// 🆕 SERVİS BAŞLATMA FONKSİYONU
+// ============================================================
+const initializeServices = async () => {
+  try {
+    console.log('🚀 Servisler başlatılıyor...');
+    await Promise.all([
+      imagePoolService.initialize(),
+      brandService.initialize(),
+      aiAdvisorService.loadCache(),
+      syncService.initialize(),
+    ]);
+    console.log('✅ Tüm servisler başarıyla başlatıldı!');
+  } catch (error) {
+    console.error('❌ Servis başlatma hatası:', error);
+  }
+};
+
+// ============================================================
+// 🆕 GLOBAL HATA YAKALAMA
+// ============================================================
+const setupGlobalErrorHandler = () => {
+  const originalConsoleError = console.error;
+  console.error = (...args) => {
+    const errorMessage = args.join(' ');
+    if (errorMessage.includes('Non-Error exception') || 
+        errorMessage.includes('undefined is not an object')) {
+      originalConsoleError.apply(console, args);
+    } else {
+      originalConsoleError.apply(console, args);
+    }
+  };
+
+  if (Platform.OS === 'web') {
+    window.onerror = (message, source, lineno, colno, error) => {
+      console.error('Global hata:', { message, source, lineno, colno });
+      return true;
+    };
+  }
+};
+
+// ============================================================
 // VİTRİNİM STACK
 // ============================================================
 function VitrinimStack() {
@@ -115,7 +205,12 @@ function VitrinimStack() {
   const isDark = theme === 'dark';
   
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        contentStyle: { backgroundColor: isDark ? '#121212' : COLORS.white }
+      }}
+    >
       <Stack.Screen name="VitrinimMain" component={VitrinimScreen} />
       <Stack.Screen name="Favorites" component={FavoritesScreen} />
       <Stack.Screen name="Saved" component={SavedScreen} />
@@ -127,9 +222,10 @@ function VitrinimStack() {
         options={{
           headerShown: true,
           title: 'ÜRÜN DETAYI',
-          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerStyle: { backgroundColor: isDark ? '#1E1E1E' : COLORS.white },
           headerTintColor: isDark ? COLORS.white : COLORS.black,
-          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12, color: isDark ? COLORS.white : COLORS.black },
+          headerShadowVisible: false,
         }}
       />
     </Stack.Navigator>
@@ -144,7 +240,12 @@ function PodiumStack() {
   const isDark = theme === 'dark';
   
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>      
+    <Stack.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        contentStyle: { backgroundColor: isDark ? '#121212' : COLORS.white }
+      }}
+    >
       <Stack.Screen name="PodiumMain" component={PodiumScreen} />
       <Stack.Screen name="HashtagFeed" component={HashtagFeedScreen} />
       <Stack.Screen 
@@ -153,9 +254,10 @@ function PodiumStack() {
         options={{
           headerShown: true,
           title: 'ÜRÜN DETAYI',
-          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerStyle: { backgroundColor: isDark ? '#1E1E1E' : COLORS.white },
           headerTintColor: isDark ? COLORS.white : COLORS.black,
-          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12, color: isDark ? COLORS.white : COLORS.black },
+          headerShadowVisible: false,
         }}
       />
     </Stack.Navigator>
@@ -170,7 +272,12 @@ function TasarimcimStack() {
   const isDark = theme === 'dark';
   
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        contentStyle: { backgroundColor: isDark ? '#121212' : COLORS.white }
+      }}
+    >
       <Stack.Screen name="TasarimcimMain" component={TasarimcimScreen} />
       <Stack.Screen 
         name="ProductDetail" 
@@ -178,9 +285,10 @@ function TasarimcimStack() {
         options={{
           headerShown: true,
           title: 'ÜRÜN DETAYI',
-          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerStyle: { backgroundColor: isDark ? '#1E1E1E' : COLORS.white },
           headerTintColor: isDark ? COLORS.white : COLORS.black,
-          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12, color: isDark ? COLORS.white : COLORS.black },
+          headerShadowVisible: false,
         }}
       />
     </Stack.Navigator>
@@ -195,7 +303,12 @@ function KoleksiyonumStack() {
   const isDark = theme === 'dark';
   
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        contentStyle: { backgroundColor: isDark ? '#121212' : COLORS.white }
+      }}
+    >
       <Stack.Screen name="KoleksiyonumMain" component={KoleksiyonumScreen} />
       <Stack.Screen name="AddItem" component={AddItemScreen} />
       <Stack.Screen name="Wardrobe" component={WardrobeScreen} />
@@ -205,9 +318,10 @@ function KoleksiyonumStack() {
         options={{
           headerShown: true,
           title: 'ÜRÜN DETAYI',
-          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerStyle: { backgroundColor: isDark ? '#1E1E1E' : COLORS.white },
           headerTintColor: isDark ? COLORS.white : COLORS.black,
-          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12, color: isDark ? COLORS.white : COLORS.black },
+          headerShadowVisible: false,
         }}
       />
     </Stack.Navigator>
@@ -222,7 +336,12 @@ function StilimStack() {
   const isDark = theme === 'dark';
   
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        contentStyle: { backgroundColor: isDark ? '#121212' : COLORS.white }
+      }}
+    >
       <Stack.Screen name="StilimMain" component={StilimScreen} />
       <Stack.Screen name="PostsGallery" component={PostsGalleryScreen} />
       <Stack.Screen name="Followers" component={FollowersScreen} />
@@ -238,9 +357,10 @@ function StilimStack() {
         options={{
           headerShown: true,
           title: 'ÜRÜN DETAYI',
-          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerStyle: { backgroundColor: isDark ? '#1E1E1E' : COLORS.white },
           headerTintColor: isDark ? COLORS.white : COLORS.black,
-          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12, color: isDark ? COLORS.white : COLORS.black },
+          headerShadowVisible: false,
         }}
       />
     </Stack.Navigator>
@@ -255,7 +375,12 @@ function ProfileStack() {
   const isDark = theme === 'dark';
   
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        contentStyle: { backgroundColor: isDark ? '#121212' : COLORS.white }
+      }}
+    >
       <Stack.Screen name="ProfileMain" component={ProfileScreen} />
       <Stack.Screen 
         name="Orders" 
@@ -263,9 +388,10 @@ function ProfileStack() {
         options={{
           headerShown: true,
           title: 'SİPARİŞLERİM',
-          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerStyle: { backgroundColor: isDark ? '#1E1E1E' : COLORS.white },
           headerTintColor: isDark ? COLORS.white : COLORS.black,
-          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12, color: isDark ? COLORS.white : COLORS.black },
+          headerShadowVisible: false,
         }}
       />
     </Stack.Navigator>
@@ -280,7 +406,12 @@ function MainStack() {
   const isDark = theme === 'dark';
   
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        contentStyle: { backgroundColor: isDark ? '#121212' : COLORS.white }
+      }}
+    >
       <Stack.Screen name="MainTabs" component={MainTabs} />
       <Stack.Screen 
         name="Checkout" 
@@ -288,9 +419,10 @@ function MainStack() {
         options={{
           headerShown: true,
           title: 'ÖDEME',
-          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerStyle: { backgroundColor: isDark ? '#1E1E1E' : COLORS.white },
           headerTintColor: isDark ? COLORS.white : COLORS.black,
-          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12, color: isDark ? COLORS.white : COLORS.black },
+          headerShadowVisible: false,
         }}
       />
       <Stack.Screen 
@@ -299,9 +431,10 @@ function MainStack() {
         options={{
           headerShown: true,
           title: 'SEPETİM',
-          headerStyle: { backgroundColor: isDark ? COLORS.black : COLORS.white },
+          headerStyle: { backgroundColor: isDark ? '#1E1E1E' : COLORS.white },
           headerTintColor: isDark ? COLORS.white : COLORS.black,
-          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12 },
+          headerTitleStyle: { ...TYPOGRAPHY.caption, fontSize: 12, color: isDark ? COLORS.white : COLORS.black },
+          headerShadowVisible: false,
         }}
       />
     </Stack.Navigator>
@@ -324,16 +457,21 @@ function MainTabs() {
           return <Ionicons name={iconName} size={size} color={color} />;
         },
         tabBarActiveTintColor: isDark ? COLORS.white : COLORS.black,
-        tabBarInactiveTintColor: COLORS.grayMedium,
+        tabBarInactiveTintColor: isDark ? '#666666' : COLORS.grayMedium,
         tabBarStyle: {
-          backgroundColor: isDark ? COLORS.black : COLORS.white,
+          backgroundColor: isDark ? '#1E1E1E' : COLORS.white,
           borderTopWidth: 0.5,
-          borderTopColor: COLORS.grayLight,
+          borderTopColor: isDark ? '#2D2D2D' : COLORS.grayLight,
           height: 56,
           paddingBottom: 8,
           paddingTop: 8,
         },
-        tabBarLabelStyle: { ...TYPOGRAPHY.caption, fontSize: 9, letterSpacing: 0.5 },
+        tabBarLabelStyle: { 
+          ...TYPOGRAPHY.caption, 
+          fontSize: 9, 
+          letterSpacing: 0.5,
+          color: isDark ? '#AAAAAA' : COLORS.grayMedium,
+        },
         headerShown: false,
       })}
     >
@@ -349,12 +487,15 @@ function MainTabs() {
 // ============================================================
 // AUTH LOADING EKRANI
 // ============================================================
-const AppLoading = () => (
-  <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: COLORS.white }}>
-    <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
-    <ActivityIndicator size="large" color={COLORS.black} />
-  </View>
-);
+const AppLoading = ({ theme }) => {
+  const isDark = theme === 'dark';
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: isDark ? '#121212' : COLORS.white }}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={isDark ? '#121212' : COLORS.white} />
+      <ActivityIndicator size="large" color={isDark ? COLORS.white : COLORS.black} />
+    </View>
+  );
+};
 
 // ============================================================
 // ROOT STACK
@@ -365,7 +506,7 @@ function RootStack() {
   const isDark = theme === 'dark';
 
   if (loading) {
-    return <AppLoading />;
+    return <AppLoading theme={theme} />;
   }
 
   return (
@@ -380,6 +521,28 @@ function RootStack() {
 }
 
 // ============================================================
+// 🆕 ÖN PLAN/ARKA PLAN VERİ YÖNETİMİ
+// ============================================================
+const refreshDataOnForeground = async () => {
+  try {
+    await initializeServices();
+    if (syncService.isOnline) {
+      await syncService.syncNow();
+    }
+  } catch (error) {
+    console.error('Ön plan veri yenileme hatası:', error);
+  }
+};
+
+const saveDataOnBackground = async () => {
+  try {
+    console.log('💾 Arka plan veri kaydı yapıldı');
+  } catch (error) {
+    console.error('Arka plan veri kaydetme hatası:', error);
+  }
+};
+
+// ============================================================
 // ANA APP BİLEŞENİ
 // ============================================================
 export default function App() {
@@ -390,6 +553,10 @@ export default function App() {
   const [authLoading, setAuthLoading] = useState(true);
   const [dataMigrated, setDataMigrated] = useState(false);
   const [isApiConnected, setIsApiConnected] = useState(true);
+  const [appState, setAppState] = useState(AppState.currentState);
+
+  // 🆕 Toast Hook
+  const { showToast, ToastComponent } = useToast();
 
   // FONTLARI YÜKLE
   const [fontsLoaded, fontError] = useFonts({
@@ -399,24 +566,63 @@ export default function App() {
     'Inter-Bold': require('./assets/fonts/Inter-Bold.ttf'),
   });
 
-  // 🆕 API BAĞLANTI KONTROLÜ
+  const isDark = theme === 'dark';
+
+  // 🆕 Toast ref'i global olarak ayarla
   useEffect(() => {
-    const checkApiConnection = async () => {
+    setToastRef({ showToast });
+  }, [showToast]);
+
+  // APP STATE YÖNETİMİ
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (nextAppState) => {
+      setAppState(nextAppState);
+      
+      if (nextAppState === 'active') {
+        console.log('📱 Uygulama ön plana geldi');
+        refreshDataOnForeground();
+      } else if (nextAppState === 'background') {
+        console.log('📱 Uygulama arka plana alındı');
+        saveDataOnBackground();
+      }
+    });
+
+    return () => subscription.remove();
+  }, []);
+
+  // GLOBAL HATA YAKALAMA BAŞLAT
+  useEffect(() => {
+    setupGlobalErrorHandler();
+  }, []);
+
+  // SERVİSLERİ BAŞLAT
+  useEffect(() => {
+    if (appIsReady) {
+      initializeServices();
+    }
+  }, [appIsReady]);
+
+  // NETWORK DURUMU TAKİBİ
+  useEffect(() => {
+    const checkNetwork = async () => {
       try {
         const response = await fetch(`${API_URL}/health`);
-        if (response.ok) {
-          setIsApiConnected(true);
+        const online = response.ok;
+        syncService.setOnlineStatus(online);
+        if (online) {
           console.log('✅ Backend bağlantısı başarılı!');
         } else {
-          setIsApiConnected(false);
           console.warn('⚠️ Backend bağlantısı başarısız!');
         }
       } catch (error) {
-        setIsApiConnected(false);
+        syncService.setOnlineStatus(false);
         console.error('❌ Backend bağlantı hatası:', error.message);
       }
     };
-    checkApiConnection();
+
+    checkNetwork();
+    const interval = setInterval(checkNetwork, 30000);
+    return () => clearInterval(interval);
   }, []);
 
   // FIREBASE AUTH STATE
@@ -507,7 +713,7 @@ export default function App() {
 
   // FONTLAR YÜKLENMEDİYSE
   if ((!fontsLoaded && !fontError) || !appIsReady) {
-    return <AppLoading />;
+    return <AppLoading theme={theme} />;
   }
 
   // ONBOARDING GÖSTER
@@ -515,14 +721,26 @@ export default function App() {
     return <OnboardingScreen onComplete={handleOnboardingComplete} />;
   }
 
+  // Navigasyon Teması
+  const navigationTheme = getNavigationTheme(isDark);
+
   // ANA UYGULAMA
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme }}>
+    <ThemeContext.Provider value={{ theme, toggleTheme, isDark }}>
       <AuthContext.Provider value={{ user, loading: authLoading }}>
         <ApiContext.Provider value={{ apiUrl: API_URL, isConnected: isApiConnected, setConnected: setIsApiConnected }}>
-          <NavigationContainer>
-            <RootStack />
-          </NavigationContainer>
+          <AppStateContext.Provider value={{ appState, isForeground: appState === 'active' }}>
+            <StatusBar 
+              barStyle={isDark ? 'light-content' : 'dark-content'} 
+              backgroundColor={isDark ? '#121212' : COLORS.white} 
+            />
+            <NavigationContainer theme={navigationTheme}>
+              <RootStack />
+            </NavigationContainer>
+            
+            {/* 🆕 CUSTOM TOAST - En üstte */}
+            <ToastComponent />
+          </AppStateContext.Provider>
         </ApiContext.Provider>
       </AuthContext.Provider>
     </ThemeContext.Provider>

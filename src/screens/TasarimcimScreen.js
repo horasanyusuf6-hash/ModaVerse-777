@@ -1,5 +1,6 @@
-// 📁 src/screens/TasarimcimScreen.js - REVİZE (AI Kartı Doğru Yönlendirme)
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+// 📁 src/screens/TasarimcimScreen.js - REVİZE (Premium Kart Eklendi)
+
+import React, { useState, useEffect, useCallback, useRef, useContext } from 'react';
 import { 
   View, 
   Text, 
@@ -16,478 +17,880 @@ import {
   Alert,
   RefreshControl,
   ActivityIndicator,
-  Platform
+  Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { COLORS, TYPOGRAPHY, SIZES } from '../constants/Theme';
+import { COLORS, TYPOGRAPHY, SIZES, getThemeColors } from '../constants/Theme';
+import { ThemeContext } from '../../App';
 
-const { width, height } = Dimensions.get('window');
+// ============================================================
+// 📌 TOAST İMPORTU
+// ============================================================
+import { showToast } from '../components/CustomAlert';
 
-// KATEGORİLER
-const CATEGORIES = [
-  { id: 'all', name: 'TÜMÜ', icon: 'grid-outline' },
-  { id: 'luxury', name: 'LÜKS', icon: 'diamond-outline' },
-  { id: 'streetwear', name: 'STREETWEAR', icon: 'walk-outline' },
-  { id: 'sustainable', name: 'SÜRDÜRÜLEBİLİR', icon: 'leaf-outline' },
-  { id: 'minimalist', name: 'MİNİMALİST', icon: 'apps-outline' },
-  { id: 'vintage', name: 'VİNTAGE', icon: 'time-outline' },
-  { id: 'sport', name: 'SPOR', icon: 'basketball-outline' },
+// ============================================================
+// 📌 SERVİS İMPORTLARI
+// ============================================================
+import imagePoolService from '../services/imagePoolService';
+import aiAdvisorService from '../services/aiAdvisorService';
+import brandService from '../services/brandService';
+
+// ============================================================
+// 📌 FASHION LIBRARY İMPORTLARI
+// ============================================================
+import { 
+  getColorInfo,
+  getProductInfo,
+  getAllProductNames,
+  getOutfitCombination,
+} from '../constants/fashionLibrary';
+
+// ============================================================
+// 📌 MARKA KATEGORİLERİ
+// ============================================================
+const BRAND_CATEGORIES = [
+  { id: 'all', label: 'TÜMÜ', icon: 'grid-outline' },
+  { id: 'luxury', label: 'LÜKS', icon: 'diamond-outline' },
+  { id: 'streetwear', label: 'SOKAK', icon: 'footsteps-outline' },
+  { id: 'sport', label: 'SPOR', icon: 'barbell-outline' },
+  { id: 'sustainable', label: 'SÜRDÜRÜLEBİLİR', icon: 'leaf-outline' },
+  { id: 'vintage', label: 'VİNTAGE', icon: 'time-outline' },
+  { id: 'minimalist', label: 'MİNİMALİST', icon: 'square-outline' },
+  { id: 'accessory', label: 'AKSESUAR', icon: 'watch-outline' },
 ];
 
-// AI İSTATİSTİKLERİ
-const AI_STATS = {
-  analyses: 1247,
-  combinations: 89,
-  matchRate: 94,
-  savedItems: 342,
-  outfitsCreated: 56,
-};
-
-// TASARIMCILAR & MARKALAR
-const designersAndBrands = [
+// ============================================================
+// 📌 MARKA VERİLERİ
+// ============================================================
+const BRANDS_DATA = [
   {
     id: '1',
-    type: 'designer',
-    name: 'Zeynep Ak',
-    title: 'Sürdürülebilir Moda Tasarımcısı',
-    avatar: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=400',
-    cover: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=800',
-    followers: 12500,
-    followersDisplay: '12.5K',
-    rating: 4.8,
-    location: 'İstanbul',
-    description: 'Sürdürülebilir ve etik moda üzerine çalışan ödüllü tasarımcı.',
-    isVerified: true,
-    trending: 98,
+    name: 'LC Waikiki',
     category: 'sustainable',
+    type: 'brand',
+    avatar: 'https://via.placeholder.com/60',
+    cover: 'https://via.placeholder.com/400x200',
+    title: 'Sürdürülebilir Moda',
+    description: 'Uygun fiyatlı ve sürdürülebilir moda anlayışı ile herkes için şık giyim.',
+    followers: 2840000,
+    advantages: ['%30 İndirim', 'Yeni Sezon', 'Ücretsiz Kargo'],
+    privileges: ['Puan Toplama', 'Özel Kampanyalar', 'Erken Erişim'],
+    trendNo: 1,
+    rating: 4.8,
+    location: 'Türkiye',
+    isVerified: true,
+    trending: 92,
     designs: [
-      { id: 'd1', image: 'https://images.unsplash.com/photo-1569317002804-ab77bcf1bce4?w=600', title: 'Eko-Koleksiyon 2024', likes: 3420, comments: 156 },
-      { id: 'd2', image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=600', title: 'Sonbahar Tasarımı', likes: 2890, comments: 98 },
-      { id: 'd3', image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=600', title: 'Paris Moda Haftası', likes: 5670, comments: 234 },
+      { id: 'd1', title: 'Bahar Koleksiyonu', image: 'https://via.placeholder.com/120x100', likes: 3400, comments: 230 },
+      { id: 'd2', title: 'Sürdürülebilir Seri', image: 'https://via.placeholder.com/120x100', likes: 2800, comments: 180 },
+      { id: 'd3', title: 'Basic Parçalar', image: 'https://via.placeholder.com/120x100', likes: 2100, comments: 150 },
     ],
+    campaigns: [
+      { id: 'c1', title: 'Yeni Sezon %30 İndirim', validUntil: '2026-12-31' },
+      { id: 'c2', title: 'Ücretsiz Kargo Fırsatı', validUntil: '2026-11-30' },
+    ]
   },
   {
     id: '2',
+    name: 'Mavi',
+    category: 'streetwear',
     type: 'brand',
-    name: 'Nike',
-    title: 'Spor Giyim & Sneaker',
-    avatar: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400',
-    cover: 'https://images.unsplash.com/photo-1544441893-973675e31985?w=800',
-    followers: 2100000,
-    followersDisplay: '2.1M',
-    rating: 4.7,
-    location: 'Global',
-    description: 'Dünyanın önde gelen spor giyim ve ayakkabı markası.',
+    avatar: 'https://via.placeholder.com/60',
+    cover: 'https://via.placeholder.com/400x200',
+    title: 'Sokak Modası',
+    description: 'Özgün ve rahat sokak modası ile gençlerin vazgeçilmez markası.',
+    followers: 1850000,
+    advantages: ['Sepette %15 İndirim', 'Kapıda Ödeme'],
+    privileges: ['VIP Üyelik', 'Özel Gün Hediyeleri'],
+    trendNo: 2,
+    rating: 4.6,
+    location: 'Türkiye',
     isVerified: true,
-    trending: 95,
-    category: 'sport',
+    trending: 85,
     designs: [
-      { id: 'd1', image: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=600', title: 'Air Max Günleri', likes: 8920, comments: 456 },
-      { id: 'd2', image: 'https://images.unsplash.com/photo-1544441893-973675e31985?w=600', title: 'Jordan Koleksiyonu', likes: 12400, comments: 892 },
-      { id: 'd3', image: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?w=600', title: 'Tech Fleece Serisi', likes: 5670, comments: 234 },
+      { id: 'd1', title: 'Sokak Stili', image: 'https://via.placeholder.com/120x100', likes: 5200, comments: 340 },
+      { id: 'd2', title: 'Denim Koleksiyonu', image: 'https://via.placeholder.com/120x100', likes: 4100, comments: 280 },
     ],
+    campaigns: [
+      { id: 'c1', title: 'Sokak Stili Haftası', validUntil: '2026-10-15' },
+    ]
   },
   {
     id: '3',
-    type: 'designer',
-    name: 'Can Demir',
-    title: 'Street Style Tasarımcısı',
-    avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=400',
-    cover: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=800',
-    followers: 8700,
-    followersDisplay: '8.7K',
-    rating: 4.6,
-    location: 'İstanbul',
-    description: 'Urban kültürden ilham alan genç tasarımcı.',
-    isVerified: false,
-    trending: 92,
-    category: 'streetwear',
-    designs: [
-      { id: 'd1', image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=600', title: 'Urban Warriors', likes: 2340, comments: 89 },
-      { id: 'd2', image: 'https://images.unsplash.com/photo-1515886657613-9f3515b0c78f?w=600', title: 'Street Collection', likes: 1890, comments: 67 },
-      { id: 'd3', image: 'https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=600', title: 'City Lights', likes: 1230, comments: 45 },
-    ],
-  },
-  {
-    id: '4',
-    type: 'brand',
-    name: 'ZARA',
-    title: 'Fast Fashion',
-    avatar: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=400',
-    cover: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800',
-    followers: 3400000,
-    followersDisplay: '3.4M',
-    rating: 4.5,
-    location: 'Global',
-    description: 'Trendleri hızlı şekilde tüketiciye ulaştıran global marka.',
-    isVerified: true,
-    trending: 88,
+    name: 'Beymen',
     category: 'luxury',
-    designs: [
-      { id: 'd1', image: 'https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=600', title: 'Sonbahar Koleksiyonu', likes: 12400, comments: 892 },
-      { id: 'd2', image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=600', title: 'Yeni Sezon', likes: 8900, comments: 456 },
-      { id: 'd3', image: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=600', title: 'Basic Serisi', likes: 5670, comments: 234 },
-    ],
-  },
-  {
-    id: '5',
-    type: 'designer',
-    name: 'Elif Şahin',
-    title: 'Lüks Giyim Tasarımcısı',
-    avatar: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=400',
-    cover: 'https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?w=800',
-    followers: 15200,
-    followersDisplay: '15.2K',
+    type: 'brand',
+    avatar: 'https://via.placeholder.com/60',
+    cover: 'https://via.placeholder.com/400x200',
+    title: 'Lüks Moda',
+    description: 'Dünya markalarını bir araya getiren lüks moda deneyimi.',
+    followers: 3200000,
+    advantages: ['Özel Alışveriş Günü', 'Kişisel Alışveriş Asistanı'],
+    privileges: ['Özel Davetiyeler', 'Lüks Sürprizler', 'Erken Sezon Erişimi'],
+    trendNo: 1,
     rating: 4.9,
-    location: 'Paris',
-    description: 'Paris merkezli lüks giyim ve haute couture tasarımcısı.',
+    location: 'Türkiye',
     isVerified: true,
-    trending: 96,
-    category: 'luxury',
+    trending: 95,
     designs: [
-      { id: 'd1', image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=600', title: 'Parisian Nights', likes: 5670, comments: 234 },
-      { id: 'd2', image: 'https://images.unsplash.com/photo-1534452203293-494d7ddbf7e0?w=600', title: 'Haute Couture', likes: 4320, comments: 178 },
-      { id: 'd3', image: 'https://images.unsplash.com/photo-1539008835657-9e8e9680c956?w=600', title: 'Golden Collection', likes: 3210, comments: 123 },
+      { id: 'd1', title: 'Sonbahar/Kış Koleksiyonu', image: 'https://via.placeholder.com/120x100', likes: 6800, comments: 450 },
+      { id: 'd2', title: 'Özel Tasarım Serisi', image: 'https://via.placeholder.com/120x100', likes: 5500, comments: 380 },
+      { id: 'd3', title: 'Lüks Aksesuarlar', image: 'https://via.placeholder.com/120x100', likes: 4900, comments: 320 },
+      { id: 'd4', title: 'Yılbaşı Koleksiyonu', image: 'https://via.placeholder.com/120x100', likes: 7200, comments: 510 },
     ],
-  },
-  {
-    id: '6',
-    type: 'brand',
-    name: 'Mango',
-    title: 'Minimalist Moda',
-    avatar: 'https://images.unsplash.com/photo-1445205170230-053b83016050?w=400',
-    cover: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=800',
-    followers: 2800000,
-    followersDisplay: '2.8M',
-    rating: 4.6,
-    location: 'Barcelona',
-    description: 'Minimalist ve şık tasarımlarıyla bilinen marka.',
-    isVerified: true,
-    trending: 85,
-    category: 'minimalist',
-    designs: [
-      { id: 'd1', image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600', title: 'Minimalist Collection', likes: 3450, comments: 123 },
-      { id: 'd2', image: 'https://images.unsplash.com/photo-1490481651871-ab68de25d43d?w=600', title: 'Neutral Tones', likes: 2780, comments: 98 },
-      { id: 'd3', image: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=600', title: 'Capsule Wardrobe', likes: 1890, comments: 67 },
-    ],
-  },
-  {
-    id: '7',
-    type: 'brand',
-    name: 'Adidas',
-    title: 'Sport Performance',
-    avatar: 'https://images.unsplash.com/photo-1587563871167-1ee9c731aefb?w=400',
-    cover: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?w=800',
-    followers: 5600000,
-    followersDisplay: '5.6M',
-    rating: 4.8,
-    location: 'Germany',
-    description: 'Spor performans ve günlük giyimde lider marka.',
-    isVerified: true,
-    trending: 94,
-    category: 'sport',
-    designs: [
-      { id: 'd1', image: 'https://images.unsplash.com/photo-1587563871167-1ee9c731aefb?w=600', title: 'Ultraboost 2024', likes: 8920, comments: 567 },
-      { id: 'd2', image: 'https://images.unsplash.com/photo-1556906781-9a412961c28c?w=600', title: 'Originals Serisi', likes: 6780, comments: 345 },
-      { id: 'd3', image: 'https://images.unsplash.com/photo-1587563871167-1ee9c731aefb?w=600', title: 'Yeezy Koleksiyonu', likes: 12340, comments: 890 },
-    ],
+    campaigns: [
+      { id: 'c1', title: 'Sezon Sonu Fırsatları', validUntil: '2026-12-31' },
+      { id: 'c2', title: 'Özel VIP Alışveriş Günü', validUntil: '2026-11-20' },
+    ]
   },
 ];
 
-// ============ AI DANIŞMAN KARTI (REVİZE - DOĞRU YÖNLENDİRME) ============
-const AIConsultantCard = ({ navigation }) => {
-  const [aiStats] = useState(AI_STATS);
+const { width } = Dimensions.get('window');
 
-  const formatNumber = (num) => {
-    if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'K';
-    }
-    return num.toString();
-  };
+// ============================================================
+// 📌 HELPERS
+// ============================================================
+const formatNumber = (num) => {
+  if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+  if (num >= 1000) return (num / 1000).toFixed(1) + 'K';
+  return num.toString();
+};
+
+// ============================================================
+// 📌 STİL KİMLİĞİ KARTLARI (YENİ - DİKDÖRTGEN, YATAY KAYDIRMA)
+// ============================================================
+const StyleIdentityCards = ({ onCardPress }) => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
+
+  const styleCards = [
+    { id: '1', title: 'Sokak Stili', image: 'https://picsum.photos/id/1/400/500', likes: 12400, comments: 3400 },
+    { id: '2', title: 'Lüks Kombin', image: 'https://picsum.photos/id/2/400/500', likes: 8900, comments: 2100 },
+    { id: '3', title: 'Minimal Look', image: 'https://picsum.photos/id/3/400/500', likes: 6700, comments: 1800 },
+    { id: '4', title: 'Vintage Tarz', image: 'https://picsum.photos/id/4/400/500', likes: 5200, comments: 1400 },
+    { id: '5', title: 'Spor Şıklık', image: 'https://picsum.photos/id/5/400/500', likes: 4800, comments: 1200 },
+  ];
 
   return (
-    <TouchableOpacity 
-      style={styles.aiCard}
-      activeOpacity={0.7}
-      onPress={() => {
-        // ✅ DOĞRU YÖNLENDİRME - Stilim tab'ına ve OutfitSuggestion ekranına git
-        navigation.navigate('Stilim', { 
-          screen: 'OutfitSuggestion' 
-        });
-      }}
-    >
-      <Image 
-        source={{ uri: 'https://images.unsplash.com/photo-1620712943543-bcc4688e7485?w=800' }} 
-        style={styles.aiCoverImage} 
-      />
-      <View style={styles.aiOverlay} />
-      <View style={styles.aiContent}>
-        <View style={styles.aiHeader}>
-          <View style={styles.aiTitleContainer}>
-            <Text style={styles.aiTitle}>AI STİL DANIŞMANIM</Text>
-            <View style={styles.aiBadge}>
-              <Ionicons name="sparkles" size={10} color={COLORS.white} />
-              <Text style={styles.aiBadgeText}>AKTİF</Text>
-            </View>
-          </View>
-          <View style={styles.aiArrowContainer}>
-            <Ionicons name="arrow-forward" size={16} color={COLORS.white} />
-          </View>
-        </View>
-        
-        <Text style={styles.aiSlogan}>💬 "Stil danışmanınla sohbet et, kombinlerini keşfet!"</Text>
-        
-        <View style={styles.aiStatsGrid}>
-          <View style={styles.aiStatCard}>
-            <View style={styles.aiStatIconBg}>
-              <Ionicons name="shirt-outline" size={14} color={COLORS.black} />
-            </View>
-            <Text style={styles.aiStatNumber}>{formatNumber(aiStats.analyses)}</Text>
-            <Text style={styles.aiStatLabel}>PARÇA</Text>
-          </View>
-          
-          <View style={styles.aiStatCard}>
-            <View style={styles.aiStatIconBg}>
-              <Ionicons name="color-palette-outline" size={14} color={COLORS.black} />
-            </View>
-            <Text style={styles.aiStatNumber}>{formatNumber(aiStats.combinations)}</Text>
-            <Text style={styles.aiStatLabel}>KOMBİN</Text>
-          </View>
-          
-          <View style={styles.aiStatCard}>
-            <View style={styles.aiStatIconBg}>
-              <Ionicons name="save-outline" size={14} color={COLORS.black} />
-            </View>
-            <Text style={styles.aiStatNumber}>{formatNumber(aiStats.savedItems)}</Text>
-            <Text style={styles.aiStatLabel}>GARDIROP</Text>
-          </View>
-          
-          <View style={styles.aiStatCard}>
-            <View style={styles.aiStatIconBg}>
-              <Ionicons name="trending-up" size={14} color={COLORS.black} />
-            </View>
-            <Text style={styles.aiStatNumber}>%{aiStats.matchRate}</Text>
-            <Text style={styles.aiStatLabel}>UYUM</Text>
-          </View>
-        </View>
-        
-        <View style={styles.aiButton}>
-          <Ionicons name="chatbubble-ellipses" size={12} color={COLORS.white} />
-          <Text style={styles.aiButtonText}>SOHBET ET</Text>
-          <Ionicons name="arrow-forward" size={10} color={COLORS.white} />
-        </View>
+    <View style={styles.styleIdentityContainer}>
+      <View style={styles.styleIdentityHeader}>
+        <Text style={[styles.styleIdentityTitle, { color: colors.text }]}>🌟 STİL KİMLİĞİM</Text>
+        <TouchableOpacity onPress={() => onCardPress?.('seeAll')}>
+          <Text style={[styles.styleIdentitySeeAll, { color: colors.textSecondary }]}>TÜMÜNÜ GÖR</Text>
+        </TouchableOpacity>
       </View>
-    </TouchableOpacity>
+
+      <FlatList
+        data={styleCards}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        renderItem={({ item }) => (
+          <TouchableOpacity 
+            style={[styles.styleIdentityCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => onCardPress?.(item)}
+            activeOpacity={0.9}
+          >
+            <Image source={{ uri: item.image }} style={styles.styleIdentityImage} />
+            <View style={styles.styleIdentityOverlay}>
+              <View style={styles.styleIdentityContent}>
+                <Text style={styles.styleIdentityCardTitle}>{item.title}</Text>
+                <View style={styles.styleIdentityStats}>
+                  <View style={styles.styleIdentityStat}>
+                    <Ionicons name="heart" size={12} color="#FF3B30" />
+                    <Text style={styles.styleIdentityStatText}>{formatNumber(item.likes)}</Text>
+                  </View>
+                  <View style={styles.styleIdentityStat}>
+                    <Ionicons name="chatbubble" size={12} color="#FFFFFF" />
+                    <Text style={styles.styleIdentityStatText}>{formatNumber(item.comments)}</Text>
+                  </View>
+                </View>
+              </View>
+            </View>
+          </TouchableOpacity>
+        )}
+        keyExtractor={item => item.id}
+        contentContainerStyle={styles.styleIdentityList}
+      />
+    </View>
   );
 };
 
-// ============ TASARIMCI/MARKA KARTI ============
-const DesignerBrandCard = ({ item, onPress, onFollow, isFollowing }) => {
-  const [showAllDesigns, setShowAllDesigns] = useState(false);
-  const displayDesigns = showAllDesigns ? item.designs : item.designs.slice(0, 2);
+// ============================================================
+// 📌 KOLEKSİYONUM (YENİ TASARIM - DÜZELTİLDİ)
+// ============================================================
+const MyCollection = ({ items, onItemPress }) => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
 
-  const formatNumber = (num) => {
-    if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'K';
-    }
-    return num.toString();
-  };
+  if (!items || items.length === 0) {
+    return (
+      <View style={[styles.collectionEmptyContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <Ionicons name="albums-outline" size={40} color={colors.textSecondary} />
+        <Text style={[styles.collectionEmptyTitle, { color: colors.text }]}>KOLEKSİYONUN BOŞ</Text>
+        <Text style={[styles.collectionEmptyText, { color: colors.textSecondary }]}>
+          Markalardan ilham alarak koleksiyon oluştur!
+        </Text>
+      </View>
+    );
+  }
 
   return (
-    <View style={styles.designerCard}>
-      <TouchableOpacity style={styles.cardHeader} onPress={() => onPress(item)} activeOpacity={0.7}>
-        <Image source={{ uri: item.avatar }} style={styles.cardAvatar} />
-        <View style={styles.cardUserInfo}>
-          <View style={styles.cardNameRow}>
-            <Text style={styles.cardName}>{item.name}</Text>
+    <View style={styles.collectionContainer}>
+      <View style={styles.collectionHeader}>
+        <Text style={[styles.collectionTitle, { color: colors.text }]}>👗 KOLEKSİYONUM</Text>
+        <TouchableOpacity onPress={() => onItemPress?.('seeAll')}>
+          <Text style={[styles.collectionSeeAll, { color: colors.textSecondary }]}>TÜMÜNÜ GÖR</Text>
+        </TouchableOpacity>
+      </View>
+
+      <FlatList
+        data={items}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        renderItem={({ item }) => (
+          <TouchableOpacity 
+            style={[styles.collectionItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+            onPress={() => onItemPress?.(item)}
+            activeOpacity={0.8}
+          >
+            <Image source={{ uri: item.image || 'https://picsum.photos/120/160' }} style={styles.collectionItemImage} />
+            <View style={styles.collectionItemInfo}>
+              <Text style={[styles.collectionItemName, { color: colors.text }]} numberOfLines={1}>{item.name || 'Parça'}</Text>
+              <Text style={[styles.collectionItemBrand, { color: colors.textSecondary }]} numberOfLines={1}>{item.brand || 'Marka'}</Text>
+              <Text style={[styles.collectionItemPrice, { color: colors.text }]}>₺{item.price || '0'}</Text>
+            </View>
+          </TouchableOpacity>
+        )}
+        keyExtractor={(item, index) => item.id || index.toString()}
+        contentContainerStyle={styles.collectionList}
+      />
+    </View>
+  );
+};
+
+// ============================================================
+// 📌 PREMİUM BİLGİLENDİRME KARTI (YENİ TASARIM)
+// ============================================================
+const PremiumInfoCard = ({ onPress }) => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
+
+  const features = [
+    { icon: 'shield-checkmark', label: 'Özel Güvenlik' },
+    { icon: 'gift', label: 'VIP Üyelik' },
+    { icon: 'cash', label: 'Kapıda Ödeme' },
+    { icon: 'pricetag', label: '%15 İndirim' },
+  ];
+
+  return (
+    <LinearGradient
+      colors={isDark ? ['#1A1A1A', '#2D2D2D'] : ['#1A1A1A', '#2D2D2D']}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+      style={[styles.premiumCard, { borderColor: isDark ? '#3D3D3D' : 'rgba(255,255,255,0.1)' }]}
+    >
+      <View style={styles.premiumCardContent}>
+        <View style={styles.premiumCardHeader}>
+          <View style={styles.premiumCardIconWrap}>
+            <Ionicons name="diamond" size={20} color="#FFD700" />
+          </View>
+          <View style={styles.premiumCardBadge}>
+            <Text style={styles.premiumCardBadgeText}>PREMIUM</Text>
+          </View>
+        </View>
+
+        <Text style={styles.premiumCardTitle}>STİL İLHAMI AL</Text>
+        <Text style={styles.premiumCardSubtitle}>
+          Markalardan ilham al, kendi stilini yarat. Premium deneyim seni bekliyor.
+        </Text>
+
+        <View style={styles.premiumCardFeatures}>
+          {features.map((item, idx) => (
+            <View key={idx} style={styles.premiumCardFeature}>
+              <Ionicons name={item.icon} size={14} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.premiumCardFeatureText}>{item.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        <TouchableOpacity 
+          style={styles.premiumCardButton} 
+          onPress={onPress}
+          activeOpacity={0.8}
+        >
+          <Text style={styles.premiumCardButtonText}>KEŞFET</Text>
+          <Ionicons name="arrow-forward" size={16} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+    </LinearGradient>
+  );
+};
+
+// ============================================================
+// 📌 MARKA KARTI BİLEŞENİ
+// ============================================================
+const BrandCard = ({ item, onPress, onFollow, isFollowing, onStyleInspire }) => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
+
+  return (
+    <TouchableOpacity 
+      style={[styles.brandCard, { borderColor: colors.border, backgroundColor: colors.surface }]}
+      onPress={() => onPress(item)}
+      activeOpacity={0.9}
+    >
+      <View style={styles.brandCardHeader}>
+        <Image source={{ uri: item.avatar }} style={[styles.brandAvatar, { borderColor: colors.border }]} />
+        <View style={styles.brandInfo}>
+          <View style={styles.brandNameRow}>
+            <Text style={[styles.brandName, { color: colors.text }]}>{item.name}</Text>
             {item.isVerified && (
-              <Ionicons name="checkmark-circle" size={12} color={COLORS.black} />
+              <Ionicons name="checkmark-circle" size={14} color={colors.primary || colors.text} />
             )}
-            <View style={styles.cardTypeBadge}>
-              <Text style={styles.cardTypeBadgeText}>
-                {item.type === 'designer' ? 'TASARIMCI' : 'MARKA'}
+            <View style={[styles.brandTrendBadge, { backgroundColor: colors.primary || colors.text }]}>
+              <Text style={[styles.brandTrendText, { color: colors.background }]}>
+                #{item.trendNo}
               </Text>
             </View>
           </View>
-          <Text style={styles.cardTitle}>{item.title}</Text>
-          <View style={styles.cardStats}>
-            <View style={styles.cardStat}>
-              <Ionicons name="people-outline" size={10} color={COLORS.grayMedium} />
-              <Text style={styles.cardStatText}>{item.followersDisplay}</Text>
+          <Text style={[styles.brandCategory, { color: colors.textSecondary }]}>
+            {BRAND_CATEGORIES.find(c => c.id === item.category)?.label || 'Moda'}
+          </Text>
+          <View style={styles.brandStats}>
+            <View style={styles.brandStat}>
+              <Ionicons name="people-outline" size={12} color={colors.textSecondary} />
+              <Text style={[styles.brandStatText, { color: colors.textSecondary }]}>
+                {formatNumber(item.followers)} Takipçi
+              </Text>
             </View>
-            <View style={styles.cardStat}>
-              <Ionicons name="star-outline" size={10} color={COLORS.grayMedium} />
-              <Text style={styles.cardStatText}>{item.rating}</Text>
-            </View>
-            <View style={styles.cardStat}>
-              <Ionicons name="location-outline" size={10} color={COLORS.grayMedium} />
-              <Text style={styles.cardStatText}>{item.location}</Text>
+            <View style={[styles.brandStatDivider, { backgroundColor: colors.border }]} />
+            <View style={styles.brandStat}>
+              <Ionicons name="star-outline" size={12} color={colors.textSecondary} />
+              <Text style={[styles.brandStatText, { color: colors.textSecondary }]}>
+                {item.rating}
+              </Text>
             </View>
           </View>
         </View>
         <TouchableOpacity 
-          style={[styles.followButton, isFollowing && styles.followButtonActive]}
+          style={[styles.followButton, isFollowing && styles.followButtonActive, { borderColor: colors.border }]}
           onPress={() => onFollow(item.id)}
         >
-          <Text style={[styles.followButtonText, isFollowing && styles.followButtonTextActive]}>
+          <Text style={[styles.followButtonText, isFollowing && styles.followButtonTextActive, { color: isFollowing ? colors.background : colors.text }]}>
             {isFollowing ? 'TAKİP' : 'TAKİP ET'}
           </Text>
         </TouchableOpacity>
-      </TouchableOpacity>
+      </View>
 
-      {item.designs && item.designs.length > 0 && (
-        <View style={styles.designsSection}>
-          <View style={styles.designsHeader}>
-            <Text style={styles.designsTitle}>
-              {item.type === 'designer' ? 'SON TASARIMLAR' : 'SON KOLEKSİYONLAR'}
-            </Text>
-            {item.designs.length > 2 && (
-              <TouchableOpacity onPress={() => setShowAllDesigns(!showAllDesigns)}>
-                <Text style={styles.designsSeeAll}>
-                  {showAllDesigns ? 'DAHA AZ' : 'TÜMÜ'}
-                </Text>
-              </TouchableOpacity>
-            )}
-          </View>
+      <View style={[styles.brandAdvantages, { borderTopColor: colors.border }]}>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          {item.advantages?.map((adv, idx) => (
+            <View key={idx} style={[styles.advantageChip, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Ionicons name="pricetag-outline" size={10} color={colors.textSecondary} />
+              <Text style={[styles.advantageText, { color: colors.textSecondary }]}>{adv}</Text>
+            </View>
+          ))}
+          {item.privileges?.map((priv, idx) => (
+            <View key={idx} style={[styles.privilegeChip, { backgroundColor: colors.primary || colors.text, borderColor: colors.border }]}>
+              <Ionicons name="star" size={10} color={colors.background} />
+              <Text style={[styles.privilegeText, { color: colors.background }]}>{priv}</Text>
+            </View>
+          ))}
+        </ScrollView>
+      </View>
+
+      <TouchableOpacity 
+        style={[styles.styleInspireButton, { borderColor: colors.border }]}
+        onPress={() => onStyleInspire(item.id)}
+      >
+        <Ionicons name="bulb-outline" size={14} color={colors.text} />
+        <Text style={[styles.styleInspireText, { color: colors.text }]}>STİL İLHAMI AL</Text>
+        <Ionicons name="arrow-forward" size={12} color={colors.text} />
+      </TouchableOpacity>
+    </TouchableOpacity>
+  );
+};
+
+// ============================================================
+// 📌 MARKA DETAY PANELİ
+// ============================================================
+const BrandDetailPanel = ({ visible, brand, onClose, isFollowing, onFollow }) => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
+
+  const [activeTab, setActiveTab] = useState('normal');
+  const [analytics, setAnalytics] = useState(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (brand && visible) {
+      loadAnalytics();
+    }
+  }, [brand, visible]);
+
+  const loadAnalytics = async () => {
+    if (!brand) return;
+    setLoading(true);
+    try {
+      const data = await brandService.getBrandAnalytics(brand.id);
+      setAnalytics(data);
+    } catch (error) {
+      console.error('Analytics yükleme hatası:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!brand) return null;
+
+  return (
+    <Modal
+      visible={visible}
+      animationType="slide"
+      transparent={false}
+      onRequestClose={onClose}
+    >
+      <SafeAreaView style={[styles.panelContainer, { backgroundColor: colors.background }]}>
+        <View style={[styles.panelHeader, { borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={onClose} style={styles.panelBackButton}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={[styles.panelTitle, { color: colors.text }]}>{brand.name}</Text>
+          <View style={styles.panelHeaderRight} />
+        </View>
+
+        <ScrollView showsVerticalScrollIndicator={false}>
+          <Image source={{ uri: brand.cover }} style={styles.panelCover} />
           
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.designsScroll}>
-            {displayDesigns.map((design, idx) => (
-              <TouchableOpacity key={idx} style={styles.designCard} activeOpacity={0.7}>
-                <Image source={{ uri: design.image }} style={styles.designImage} />
-                <View style={styles.designOverlay}>
-                  <Text style={styles.designTitle} numberOfLines={1}>{design.title}</Text>
-                  <View style={styles.designStats}>
-                    <View style={styles.designStat}>
-                      <Ionicons name="heart-outline" size={8} color={COLORS.white} />
-                      <Text style={styles.designStatText}>{formatNumber(design.likes)}</Text>
-                    </View>
-                    <View style={styles.designStat}>
-                      <Ionicons name="chatbubble-outline" size={8} color={COLORS.white} />
-                      <Text style={styles.designStatText}>{formatNumber(design.comments)}</Text>
+          <View style={styles.panelContent}>
+            <View style={styles.panelProfileSection}>
+              <Image source={{ uri: brand.avatar }} style={[styles.panelAvatar, { borderColor: colors.background }]} />
+              <View style={styles.panelProfileInfo}>
+                <Text style={[styles.panelBrandName, { color: colors.text }]}>{brand.name}</Text>
+                <Text style={[styles.panelBrandTitle, { color: colors.textSecondary }]}>{brand.title}</Text>
+                <Text style={[styles.panelBrandLocation, { color: colors.textSecondary }]}>
+                  <Ionicons name="location-outline" size={12} /> {brand.location}
+                </Text>
+              </View>
+            </View>
+
+            <View style={[styles.panelStats, { borderColor: colors.border }]}>
+              <View style={styles.panelStat}>
+                <Text style={[styles.panelStatNumber, { color: colors.text }]}>{formatNumber(brand.followers)}</Text>
+                <Text style={[styles.panelStatLabel, { color: colors.textSecondary }]}>TAKİPÇİ</Text>
+              </View>
+              <View style={[styles.panelStatDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.panelStat}>
+                <Text style={[styles.panelStatNumber, { color: colors.text }]}>{brand.rating}</Text>
+                <Text style={[styles.panelStatLabel, { color: colors.textSecondary }]}>PUAN</Text>
+              </View>
+              <View style={[styles.panelStatDivider, { backgroundColor: colors.border }]} />
+              <View style={styles.panelStat}>
+                <Text style={[styles.panelStatNumber, { color: colors.text }]}>#{brand.trendNo}</Text>
+                <Text style={[styles.panelStatLabel, { color: colors.textSecondary }]}>TREND</Text>
+              </View>
+            </View>
+
+            {brand.campaigns && brand.campaigns.length > 0 && (
+              <View style={styles.panelCampaigns}>
+                <Text style={[styles.panelSectionTitle, { color: colors.text }]}>📢 AKTİF KAMPANYALAR</Text>
+                {brand.campaigns.map((campaign, idx) => (
+                  <View key={idx} style={[styles.panelCampaign, { borderColor: colors.border }]}>
+                    <Ionicons name="megaphone-outline" size={16} color={colors.text} />
+                    <View style={styles.panelCampaignInfo}>
+                      <Text style={[styles.panelCampaignTitle, { color: colors.text }]}>{campaign.title}</Text>
+                      <Text style={[styles.panelCampaignDate, { color: colors.textSecondary }]}>
+                        Son Kullanım: {campaign.validUntil}
+                      </Text>
                     </View>
                   </View>
+                ))}
+              </View>
+            )}
+
+            {analytics && (
+              <View style={styles.panelAnalytics}>
+                <Text style={[styles.panelSectionTitle, { color: colors.text }]}>📊 TRAFİK ANALİZİ</Text>
+                <View style={[styles.panelAnalyticsGrid, { borderColor: colors.border }]}>
+                  <View style={[styles.panelAnalyticsItem, { borderColor: colors.border }]}>
+                    <Text style={[styles.panelAnalyticsNumber, { color: colors.text }]}>{formatNumber(analytics.views || 0)}</Text>
+                    <Text style={[styles.panelAnalyticsLabel, { color: colors.textSecondary }]}>Ziyaret</Text>
+                  </View>
+                  <View style={[styles.panelAnalyticsItem, { borderColor: colors.border }]}>
+                    <Text style={[styles.panelAnalyticsNumber, { color: colors.text }]}>{formatNumber(analytics.engagements || 0)}</Text>
+                    <Text style={[styles.panelAnalyticsLabel, { color: colors.textSecondary }]}>Etkileşim</Text>
+                  </View>
+                  <View style={[styles.panelAnalyticsItem, { borderColor: colors.border }]}>
+                    <Text style={[styles.panelAnalyticsNumber, { color: colors.text }]}>{analytics.conversionRate || 0}%</Text>
+                    <Text style={[styles.panelAnalyticsLabel, { color: colors.textSecondary }]}>Dönüşüm</Text>
+                  </View>
                 </View>
+              </View>
+            )}
+
+            <View style={[styles.panelTabs, { borderColor: colors.border }]}>
+              <TouchableOpacity
+                style={[styles.panelTab, activeTab === 'normal' && styles.panelTabActive, { backgroundColor: activeTab === 'normal' ? colors.text : colors.background }]}
+                onPress={() => setActiveTab('normal')}
+              >
+                <Text style={[styles.panelTabText, activeTab === 'normal' && styles.panelTabTextActive, { color: activeTab === 'normal' ? colors.background : colors.text }]}>
+                  NORMAL
+                </Text>
               </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
-    </View>
-  );
-};
-
-// ============ KATEGORİ FİLTRELEME ============
-const CategoryFilters = ({ selectedCategory, onSelectCategory }) => {
-  return (
-    <ScrollView 
-      horizontal 
-      showsHorizontalScrollIndicator={false} 
-      style={styles.categoriesScroll}
-      contentContainerStyle={styles.categoriesContent}
-    >
-      {CATEGORIES.map((category) => (
-        <TouchableOpacity
-          key={category.id}
-          style={[styles.categoryChip, selectedCategory === category.id && styles.categoryChipActive]}
-          onPress={() => onSelectCategory(category.id)}
-        >
-          <Ionicons 
-            name={category.icon} 
-            size={12} 
-            color={selectedCategory === category.id ? COLORS.white : COLORS.grayMedium} 
-          />
-          <Text style={[styles.categoryChipText, selectedCategory === category.id && styles.categoryChipTextActive]}>
-            {category.name}
-          </Text>
-        </TouchableOpacity>
-      ))}
-    </ScrollView>
-  );
-};
-
-// ============ TREND BÖLÜMÜ ============
-const TrendingSection = ({ items, onPress, onFollow, following, type }) => {
-  return (
-    <View style={styles.trendingSection}>
-      <View style={styles.trendingHeader}>
-        <Text style={styles.trendingTitle}>
-          TREND {type === 'designer' ? 'TASARIMCILAR' : 'MARKALAR'}
-        </Text>
-      </View>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.trendingScroll}>
-        {items.map((item) => (
-          <TouchableOpacity 
-            key={item.id} 
-            style={styles.trendingCard}
-            onPress={() => onPress(item)}
-            activeOpacity={0.7}
-          >
-            <Image source={{ uri: item.avatar }} style={styles.trendingAvatar} />
-            <Text style={styles.trendingName} numberOfLines={1}>{item.name}</Text>
-            <Text style={styles.trendingTitleText} numberOfLines={1}>{item.title}</Text>
-            <View style={styles.trendingTrend}>
-              <Ionicons name="trending-up" size={8} color={COLORS.grayMedium} />
-              <Text style={styles.trendingPercent}>%{item.trending}</Text>
+              <TouchableOpacity
+                style={[styles.panelTab, activeTab === 'personal' && styles.panelTabActive, { backgroundColor: activeTab === 'personal' ? colors.text : colors.background }]}
+                onPress={() => setActiveTab('personal')}
+              >
+                <Text style={[styles.panelTabText, activeTab === 'personal' && styles.panelTabTextActive, { color: activeTab === 'personal' ? colors.background : colors.text }]}>
+                  BANA ÖZEL
+                </Text>
+              </TouchableOpacity>
             </View>
-            <TouchableOpacity 
-              style={[styles.trendingFollowBtn, following.includes(item.id) && styles.trendingFollowBtnActive]}
-              onPress={() => onFollow(item.id)}
-            >
-              <Text style={[styles.trendingFollowBtnText, following.includes(item.id) && styles.trendingFollowBtnTextActive]}>
-                {following.includes(item.id) ? 'TAKİP' : 'TAKİP ET'}
-              </Text>
-            </TouchableOpacity>
+
+            {activeTab === 'normal' && (
+              <View style={styles.panelTabContent}>
+                <Text style={[styles.panelDescription, { color: colors.text }]}>{brand.description}</Text>
+                
+                <View style={styles.panelAdvantages}>
+                  <Text style={[styles.panelSubTitle, { color: colors.text }]}>✨ Avantajlar</Text>
+                  <View style={styles.panelAdvantagesGrid}>
+                    {brand.advantages.map((adv, idx) => (
+                      <View key={idx} style={[styles.panelAdvantageItem, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <Ionicons name="checkmark-circle" size={16} color={colors.text} />
+                        <Text style={[styles.panelAdvantageText, { color: colors.text }]}>{adv}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                <View style={styles.panelPrivileges}>
+                  <Text style={[styles.panelSubTitle, { color: colors.text }]}>⭐ Ayrıcalıklar</Text>
+                  <View style={styles.panelPrivilegesGrid}>
+                    {brand.privileges.map((priv, idx) => (
+                      <View key={idx} style={[styles.panelPrivilegeItem, { backgroundColor: colors.text }]}>
+                        <Ionicons name="star" size={14} color={colors.background} />
+                        <Text style={[styles.panelPrivilegeText, { color: colors.background }]}>{priv}</Text>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+
+                {brand.designs && brand.designs.length > 0 && (
+                  <View style={styles.panelDesigns}>
+                    <Text style={[styles.panelSubTitle, { color: colors.text }]}>👗 Koleksiyonlar</Text>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+                      {brand.designs.map((design, idx) => (
+                        <TouchableOpacity key={idx} style={[styles.panelDesignItem, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                          <Image source={{ uri: design.image }} style={styles.panelDesignImage} />
+                          <Text style={[styles.panelDesignTitle, { color: colors.text }]} numberOfLines={1}>{design.title}</Text>
+                          <View style={styles.panelDesignStats}>
+                            <Ionicons name="heart-outline" size={10} color={colors.textSecondary} />
+                            <Text style={[styles.panelDesignStatText, { color: colors.textSecondary }]}>{formatNumber(design.likes)}</Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {activeTab === 'personal' && (
+              <View style={styles.panelTabContent}>
+                <Text style={[styles.panelPersonalTitle, { color: colors.text }]}>👤 Sana Özel Öneriler</Text>
+                <View style={[styles.panelPersonalCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                  <Ionicons name="sparkles" size={24} color={colors.text} />
+                  <View style={styles.panelPersonalInfo}>
+                    <Text style={[styles.panelPersonalText, { color: colors.text }]}>Bu markaya özel stil önerileri</Text>
+                    <Text style={[styles.panelPersonalSubText, { color: colors.textSecondary }]}>
+                      {brand.name} tarzına uygun kombinler ve ürün önerileri
+                    </Text>
+                  </View>
+                </View>
+                
+                <View style={styles.panelPersonalRecommendations}>
+                  <Text style={[styles.panelSubTitle, { color: colors.text }]}>🎯 Sana Özel Kombinler</Text>
+                  <View style={[styles.panelPersonalRecItem, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+                    <Image source={{ uri: 'https://via.placeholder.com/60x60' }} style={styles.panelPersonalRecImage} />
+                    <View style={styles.panelPersonalRecInfo}>
+                      <Text style={[styles.panelPersonalRecTitle, { color: colors.text }]}>{brand.name} Tarzı Kombin</Text>
+                      <Text style={[styles.panelPersonalRecDesc, { color: colors.textSecondary }]}>Bu kombin sana çok yakışacak!</Text>
+                    </View>
+                    <TouchableOpacity style={[styles.panelPersonalRecButton, { backgroundColor: colors.text }]}>
+                      <Text style={[styles.panelPersonalRecButtonText, { color: colors.background }]}>DENE</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              </View>
+            )}
+          </View>
+        </ScrollView>
+
+        <View style={[styles.panelFooter, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
+          <TouchableOpacity 
+            style={[styles.panelFollowButton, isFollowing && styles.panelFollowButtonActive, { borderColor: colors.border, backgroundColor: isFollowing ? colors.text : 'transparent' }]}
+            onPress={() => {
+              onFollow(brand.id);
+              onClose();
+            }}
+          >
+            <Text style={[styles.panelFollowText, isFollowing && styles.panelFollowTextActive, { color: isFollowing ? colors.background : colors.text }]}>
+              {isFollowing ? 'TAKİP EDİLİYOR' : 'TAKİP ET'}
+            </Text>
           </TouchableOpacity>
-        ))}
-      </ScrollView>
-    </View>
+          <TouchableOpacity 
+            style={[styles.panelInspireButton, { backgroundColor: colors.text }]}
+            onPress={() => {
+              showToast({
+                title: '✨ Stil İlhamı',
+                message: `${brand.name} tarzı için özel öneriler geliyor!`,
+                type: 'success',
+                autoClose: false,
+                showPremium: true,
+              });
+            }}
+          >
+            <Ionicons name="bulb-outline" size={16} color={colors.background} />
+            <Text style={[styles.panelInspireText, { color: colors.background }]}>STİL İLHAMI AL</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    </Modal>
   );
 };
 
-// ============ ANA BİLEŞEN ============
+// ============================================================
+// 📌 AI KONUŞMA MODALI
+// ============================================================
+const AIConversationModal = ({ visible, onClose }) => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
+
+  const [messages, setMessages] = useState([
+    {
+      id: '1',
+      text: '👋 Merhaba! Ben ModaVerse AI Stil Danışmanı. Sana markalar, kombin önerileri, hava durumu ve stil ipuçları konusunda yardımcı olabilirim. Sormak istediğin bir şey var mı?',
+      sender: 'ai',
+      timestamp: new Date(),
+    },
+  ]);
+  const [inputText, setInputText] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const flatListRef = useRef(null);
+
+  const sendMessage = async () => {
+    if (!inputText.trim()) return;
+
+    const userMessage = {
+      id: Date.now().toString(),
+      text: inputText.trim(),
+      sender: 'user',
+      timestamp: new Date(),
+    };
+
+    setMessages(prev => [...prev, userMessage]);
+    setInputText('');
+    setIsLoading(true);
+
+    try {
+      const response = await aiAdvisorService.getAdvice(userMessage.text);
+      
+      const aiMessage = {
+        id: (Date.now() + 1).toString(),
+        text: response || 'Üzgünüm, şu anda bir cevap üretemiyorum. Lütfen tekrar dener misin?',
+        sender: 'ai',
+        timestamp: new Date(),
+      };
+
+      setMessages(prev => [...prev, aiMessage]);
+    } catch (error) {
+      console.error('AI yanıt hatası:', error);
+      const errorMessage = {
+        id: (Date.now() + 1).toString(),
+        text: '⚠️ Üzgünüm, şu anda AI servisine bağlanılamıyor. Lütfen daha sonra tekrar dener misin?',
+        sender: 'ai',
+        timestamp: new Date(),
+      };
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
+    }
+  };
+
+  const renderMessage = ({ item }) => {
+    const isAI = item.sender === 'ai';
+    return (
+      <View style={[styles.messageWrapper, isAI ? styles.aiMessageWrapper : styles.userMessageWrapper]}>
+        {isAI && (
+          <View style={styles.aiAvatarContainer}>
+            <View style={[styles.aiAvatar, { backgroundColor: colors.primary || colors.text }]}>
+              <Ionicons name="color-wand" size={16} color={colors.background} />
+            </View>
+          </View>
+        )}
+        <View style={[styles.messageBubble, isAI ? [styles.aiBubble, { backgroundColor: colors.surface }] : [styles.userBubble, { backgroundColor: colors.primary || colors.text }]]}>
+          <Text style={[styles.messageText, isAI ? [styles.aiMessageText, { color: colors.text }] : [styles.userMessageText, { color: colors.background }]]}>
+            {item.text}
+          </Text>
+          <Text style={[styles.messageTime, { color: colors.textSecondary }]}>
+            {item.timestamp.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}
+          </Text>
+        </View>
+      </View>
+    );
+  };
+
+  return (
+    <Modal visible={visible} animationType="slide" transparent={false} onRequestClose={onClose}>
+      <SafeAreaView style={[styles.modalContainer, { backgroundColor: colors.background }]}>
+        <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+          <TouchableOpacity onPress={onClose} style={styles.modalBackButton}>
+            <Ionicons name="arrow-back" size={24} color={colors.text} />
+          </TouchableOpacity>
+          <View style={styles.modalHeaderCenter}>
+            <View style={[styles.modalHeaderAvatar, { backgroundColor: colors.primary || colors.text }]}>
+              <Ionicons name="color-wand" size={20} color={colors.background} />
+            </View>
+            <View>
+              <Text style={[styles.modalHeaderTitle, { color: colors.text }]}>AI Stil Danışmanı</Text>
+              <View style={styles.modalHeaderStatus}>
+                <View style={[styles.statusDot, { backgroundColor: '#4CAF50' }]} />
+                <Text style={[styles.modalHeaderStatusText, { color: colors.textSecondary }]}>ÇEVRİMİÇİ</Text>
+              </View>
+            </View>
+          </View>
+          <TouchableOpacity onPress={() => {
+            setMessages([{
+              id: '1',
+              text: '👋 Merhaba! Ben ModaVerse AI Stil Danışmanı. Sana nasıl yardımcı olabilirim?',
+              sender: 'ai',
+              timestamp: new Date(),
+            }]);
+          }} style={styles.modalResetButton}>
+            <Ionicons name="refresh-outline" size={20} color={colors.textSecondary} />
+          </TouchableOpacity>
+        </View>
+
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={item => item.id}
+          contentContainerStyle={styles.messagesList}
+          onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+        />
+
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}>
+          <View style={[styles.inputContainer, { borderTopColor: colors.border, backgroundColor: colors.background }]}>
+            <TextInput
+              style={[styles.input, { backgroundColor: colors.surface, borderColor: colors.border, color: colors.text }]}
+              placeholder="Bir şeyler sor..."
+              placeholderTextColor={colors.textSecondary}
+              value={inputText}
+              onChangeText={setInputText}
+              multiline
+              maxLength={500}
+            />
+            <TouchableOpacity
+              style={[styles.sendButton, !inputText.trim() && styles.sendButtonDisabled, { backgroundColor: !inputText.trim() ? colors.surface : colors.primary || colors.text }]}
+              onPress={sendMessage}
+              disabled={!inputText.trim() || isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color={colors.background} />
+              ) : (
+                <Ionicons name="send" size={18} color={colors.background} />
+              )}
+            </TouchableOpacity>
+          </View>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </Modal>
+  );
+};
+
+// ============================================================
+// 📌 ANA BİLEŞEN
+// ============================================================
 const TasarimcimScreen = ({ navigation }) => {
+  const { theme } = useContext(ThemeContext);
+  const isDark = theme === 'dark';
+  const colors = getThemeColors(isDark);
+
   const [searchQuery, setSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('designers');
   const [selectedCategory, setSelectedCategory] = useState('all');
-  const [selectedItem, setSelectedItem] = useState(null);
+  const [selectedBrand, setSelectedBrand] = useState(null);
   const [following, setFollowing] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
-  const [isLoadingMore, setIsLoadingMore] = useState(false);
-  const [page, setPage] = useState(1);
-  const [displayData, setDisplayData] = useState([]);
-  const pageSize = 5;
-  
+  const [brands, setBrands] = useState(BRANDS_DATA);
+  const [aiModalVisible, setAiModalVisible] = useState(false);
+  const [brandPanelVisible, setBrandPanelVisible] = useState(false);
   const flatListRef = useRef(null);
+
+  const [collectionItems, setCollectionItems] = useState([
+    { id: 'c1', name: 'Deri Ceket', brand: 'Zara', price: '1299', image: 'https://picsum.photos/id/10/120/160' },
+    { id: 'c2', name: 'Sneaker', brand: 'Nike', price: '899', image: 'https://picsum.photos/id/20/120/160' },
+    { id: 'c3', name: 'Elbise', brand: 'Mavi', price: '599', image: 'https://picsum.photos/id/30/120/160' },
+    { id: 'c4', name: 'Saat', brand: 'Daniel Wellington', price: '2499', image: 'https://picsum.photos/id/40/120/160' },
+  ]);
 
   useEffect(() => {
     loadFollowing();
+    loadBrands();
+    initializeServices();
   }, []);
 
-  useEffect(() => {
-    updateDisplayData();
-  }, [searchQuery, selectedCategory, activeTab, following, page]);
+  const initializeServices = async () => {
+    try {
+      await brandService.initialize();
+      await imagePoolService.initialize();
+      await aiAdvisorService.loadCache();
+    } catch (error) {
+      console.error('Servis başlatma hatası:', error);
+    }
+  };
 
   const loadFollowing = async () => {
     try {
-      const saved = await AsyncStorage.getItem('@following_designers');
+      const saved = await AsyncStorage.getItem('@following_brands');
       const followingList = saved ? JSON.parse(saved) : [];
       setFollowing(followingList);
     } catch (error) {
-      console.error(error);
+      console.error('Takip yükleme hatası:', error);
+    }
+  };
+
+  const loadBrands = async () => {
+    try {
+      const savedBrands = await AsyncStorage.getItem('@brands_data');
+      if (savedBrands) {
+        setBrands(JSON.parse(savedBrands));
+      }
+    } catch (error) {
+      console.error('Marka yükleme hatası:', error);
     }
   };
 
   const saveFollowing = async (followingList) => {
     try {
-      await AsyncStorage.setItem('@following_designers', JSON.stringify(followingList));
+      await AsyncStorage.setItem('@following_brands', JSON.stringify(followingList));
     } catch (error) {
-      console.error(error);
+      console.error('Takip kaydetme hatası:', error);
     }
   };
 
-  const getFilteredData = () => {
-    let filtered = designersAndBrands.filter(item => item.type === activeTab);
+  const getFilteredBrands = () => {
+    let filtered = brands;
     
     if (selectedCategory !== 'all') {
       filtered = filtered.filter(item => item.category === selectedCategory);
@@ -502,235 +905,238 @@ const TasarimcimScreen = ({ navigation }) => {
       );
     }
     
-    filtered.sort((a, b) => b.trending - a.trending);
+    filtered.sort((a, b) => a.trendNo - b.trendNo);
     return filtered;
   };
 
-  const updateDisplayData = () => {
-    const filtered = getFilteredData();
-    setDisplayData(filtered.slice(0, page * pageSize));
-  };
-
-  const loadMoreData = () => {
-    if (isLoadingMore) return;
-    const filtered = getFilteredData();
-    if (page * pageSize < filtered.length) {
-      setIsLoadingMore(true);
-      setTimeout(() => {
-        setPage(prev => prev + 1);
-        setIsLoadingMore(false);
-      }, 500);
+  const handleFollow = async (brandId) => {
+    const isFollowing = following.includes(brandId);
+    let newFollowing;
+    
+    if (isFollowing) {
+      await brandService.unfollowBrand(brandId);
+      newFollowing = following.filter(id => id !== brandId);
+    } else {
+      await brandService.followBrand(brandId);
+      newFollowing = [...following, brandId];
     }
-  };
-
-  const handleFollow = async (itemId) => {
-    const isCurrentlyFollowing = following.includes(itemId);
-    const newFollowing = isCurrentlyFollowing
-      ? following.filter(id => id !== itemId)
-      : [...following, itemId];
     
     setFollowing(newFollowing);
     await saveFollowing(newFollowing);
-    
-    const item = designersAndBrands.find(d => d.id === itemId);
-    Alert.alert(
-      isCurrentlyFollowing ? 'Takip Bırakıldı' : 'Takip Ediliyor',
-      `${item?.name || 'Kullanıcı'} artık ${isCurrentlyFollowing ? 'takip etmiyorsunuz' : 'takip ediyorsunuz'}.`
-    );
+
+    const brand = brands.find(b => b.id === brandId);
+    showToast({
+      title: isFollowing ? 'Takip Bırakıldı' : 'Takip Ediliyor',
+      message: `${brand?.name || 'Marka'} artık ${isFollowing ? 'takip etmiyorsunuz' : 'takip ediyorsunuz'}. Yeni stiller keşfetmek ister misin?`,
+      type: isFollowing ? 'info' : 'success',
+      autoClose: false,
+      showPremium: !isFollowing,
+    });
+  };
+
+  const handleStyleInspire = async (brandId) => {
+    const brand = brands.find(b => b.id === brandId);
+    if (!brand) return;
+
+    try {
+      const suggestion = await aiAdvisorService.getStyleAdvice(brand.name, brand.category);
+      showToast({
+        title: '✨ Stil İlhamı',
+        message: `${brand.name} tarzı için öneriler hazır!`,
+        type: 'success',
+        autoClose: false,
+        showPremium: true,
+      });
+    } catch (error) {
+      console.error('Stil önerisi hatası:', error);
+      showToast({
+        title: '✨ Stil İlhamı',
+        message: `${brand.name} tarzı için sade, şık ve rahat parçalar tercih et.`,
+        type: 'success',
+        autoClose: false,
+        showPremium: true,
+      });
+    }
   };
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setPage(1);
     await loadFollowing();
+    await loadBrands();
+    await initializeServices();
     setTimeout(() => setRefreshing(false), 1000);
   }, []);
 
   const handleCategorySelect = (categoryId) => {
     setSelectedCategory(categoryId);
-    setPage(1);
     flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
-  const getTrendingItems = () => {
-    return designersAndBrands
-      .filter(item => item.type === activeTab)
-      .sort((a, b) => b.trending - a.trending)
-      .slice(0, 5);
-  };
-
-  const EmptyState = () => {
-    const hasFilters = searchQuery || selectedCategory !== 'all';
-    return (
-      <View style={styles.emptyContainer}>
-        <View style={styles.emptyIconContainer}>
-          <Ionicons name="search-outline" size={32} color={COLORS.grayMedium} />
-        </View>
-        <Text style={styles.emptyTitle}>SONUÇ BULUNAMADI</Text>
-        <Text style={styles.emptyText}>
-          {searchQuery ? `"${searchQuery}" ile eşleşen ${activeTab === 'designers' ? 'tasarımcı' : 'marka'} yok` : 
-           selectedCategory !== 'all' ? `Bu kategoride ${activeTab === 'designers' ? 'tasarımcı' : 'marka'} yok` :
-           `${activeTab === 'designers' ? 'Tasarımcı' : 'Marka'} bulunamadı`}
-        </Text>
-        {hasFilters && (
-          <TouchableOpacity 
-            style={styles.clearButton} 
-            onPress={() => {
-              setSearchQuery('');
-              setSelectedCategory('all');
-            }}
-          >
-            <Text style={styles.clearButtonText}>FİLTRELERİ TEMİZLE</Text>
-          </TouchableOpacity>
-        )}
-      </View>
-    );
-  };
-
-  const DesignerDetailModal = () => {
-    if (!selectedItem) return null;
-    
-    return (
-      <Modal
-        visible={!!selectedItem}
-        animationType="slide"
-        transparent={true}
-        onRequestClose={() => setSelectedItem(null)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContainer}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              <View style={styles.modalHeader}>
-                <Image source={{ uri: selectedItem.cover }} style={styles.modalCover} />
-                <TouchableOpacity style={styles.closeButton} onPress={() => setSelectedItem(null)}>
-                  <Ionicons name="close" size={20} color={COLORS.white} />
-                </TouchableOpacity>
-                <View style={styles.modalProfile}>
-                  <Image source={{ uri: selectedItem.avatar }} style={styles.modalAvatar} />
-                  <View style={styles.modalProfileInfo}>
-                    <Text style={styles.modalName}>{selectedItem.name}</Text>
-                    <Text style={styles.modalTitle}>{selectedItem.title}</Text>
-                  </View>
-                </View>
-              </View>
-              <View style={styles.modalContent}>
-                <Text style={styles.modalDescription}>{selectedItem.description}</Text>
-                <View style={styles.modalStats}>
-                  <View style={styles.modalStat}>
-                    <Text style={styles.modalStatNumber}>{selectedItem.followersDisplay}</Text>
-                    <Text style={styles.modalStatLabel}>TAKİPÇİ</Text>
-                  </View>
-                  <View style={styles.modalStatDivider} />
-                  <View style={styles.modalStat}>
-                    <Text style={styles.modalStatNumber}>{selectedItem.rating}</Text>
-                    <Text style={styles.modalStatLabel}>PUAN</Text>
-                  </View>
-                </View>
-                
-                {selectedItem.designs && selectedItem.designs.length > 0 && (
-                  <View style={styles.modalDesignsSection}>
-                    <Text style={styles.modalDesignsTitle}>
-                      {selectedItem.type === 'designer' ? 'TASARIMLARIM' : 'KOLEKSİYONLARIM'}
-                    </Text>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-                      {selectedItem.designs.map((design, idx) => (
-                        <TouchableOpacity key={idx} style={styles.modalDesignCard}>
-                          <Image source={{ uri: design.image }} style={styles.modalDesignImage} />
-                          <Text style={styles.modalDesignTitle}>{design.title}</Text>
-                        </TouchableOpacity>
-                      ))}
-                    </ScrollView>
-                  </View>
-                )}
-                
-                <TouchableOpacity 
-                  style={[styles.modalFollowButton, following.includes(selectedItem.id) && styles.modalFollowButtonActive]}
-                  onPress={() => {
-                    handleFollow(selectedItem.id);
-                    setSelectedItem(null);
-                  }}
-                >
-                  <Text style={[styles.modalFollowText, following.includes(selectedItem.id) && styles.modalFollowTextActive]}>
-                    {following.includes(selectedItem.id) ? 'TAKİP EDİLİYOR' : 'TAKİP ET'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </ScrollView>
-          </View>
-        </View>
-      </Modal>
-    );
-  };
-
+  // ============================================================
+  // 📌 LIST HEADER
+  // ============================================================
   const ListHeader = () => (
     <>
-      <AIConsultantCard navigation={navigation} />
+      <StyleIdentityCards onCardPress={(item) => {
+        if (item === 'seeAll') {
+          showToast({
+            title: 'Tüm Stiller',
+            message: 'Tüm stil kimliği kartları gösteriliyor.',
+            type: 'info',
+            autoClose: true,
+            autoCloseDelay: 1500,
+          });
+        } else {
+          showToast({
+            title: 'Stil Detayı',
+            message: `${item.title} stili detayları gösteriliyor.`,
+            type: 'info',
+            autoClose: true,
+            autoCloseDelay: 1500,
+          });
+        }
+      }} />
 
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'designers' && styles.tabButtonActive]}
-          onPress={() => {
-            setActiveTab('designers');
-            setPage(1);
-            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-          }}
-        >
-          <Ionicons name="person" size={14} color={activeTab === 'designers' ? COLORS.white : COLORS.grayMedium} />
-          <Text style={[styles.tabButtonText, activeTab === 'designers' && styles.tabButtonTextActive]}>
-            TASARIMCILAR
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tabButton, activeTab === 'brands' && styles.tabButtonActive]}
-          onPress={() => {
-            setActiveTab('brands');
-            setPage(1);
-            flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
-          }}
-        >
-          <Ionicons name="business" size={14} color={activeTab === 'brands' ? COLORS.white : COLORS.grayMedium} />
-          <Text style={[styles.tabButtonText, activeTab === 'brands' && styles.tabButtonTextActive]}>
-            MARKALAR
-          </Text>
-        </TouchableOpacity>
-      </View>
-
-      <CategoryFilters selectedCategory={selectedCategory} onSelectCategory={handleCategorySelect} />
-
-      <TrendingSection 
-        items={getTrendingItems()}
-        onPress={setSelectedItem}
-        onFollow={handleFollow}
-        following={following}
-        type={activeTab}
+      <MyCollection 
+        items={collectionItems} 
+        onItemPress={(item) => {
+          if (item === 'seeAll') {
+            showToast({
+              title: 'Tüm Koleksiyon',
+              message: 'Tüm koleksiyon öğeleri gösteriliyor.',
+              type: 'info',
+              autoClose: true,
+              autoCloseDelay: 1500,
+            });
+          } else {
+            showToast({
+              title: 'Ürün Detayı',
+              message: `${item.name} ürün detayları gösteriliyor.`,
+              type: 'info',
+              autoClose: true,
+              autoCloseDelay: 1500,
+            });
+          }
+        }}
       />
+
+      <PremiumInfoCard onPress={() => {
+        showToast({
+          title: '✨ Premium',
+          message: 'Premium özellikler gösteriliyor. Stil ilhamı almak ister misin?',
+          type: 'success',
+          autoClose: false,
+          showPremium: true,
+        });
+      }} />
+
+      <TouchableOpacity 
+        style={[styles.aiCard, { borderColor: colors.border }]}
+        onPress={() => setAiModalVisible(true)}
+        activeOpacity={0.85}
+      >
+        <LinearGradient
+          colors={['#1a1a1a', '#2d2d2d', '#1a1a1a']}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.aiCardGradient}
+        >
+          <View style={styles.aiCardContent}>
+            <View style={styles.aiCardHeader}>
+              <View style={[styles.aiCardIconContainer, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+                <Ionicons name="color-wand" size={24} color={colors.primary || COLORS.white} />
+              </View>
+              <View style={[styles.aiCardBadge, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
+                <View style={[styles.aiCardBadgeDot, { backgroundColor: '#4CAF50' }]} />
+                <Text style={[styles.aiCardBadgeText, { color: COLORS.white }]}>AKTİF</Text>
+              </View>
+            </View>
+            
+            <Text style={[styles.aiCardTitle, { color: COLORS.white }]}>AI Stil Danışmanı</Text>
+            <Text style={[styles.aiCardSubtitle, { color: 'rgba(255,255,255,0.7)' }]}>
+              💬 "Marka önerileri, kombin fikirleri ve stil ipuçları için AI danışmanını aktif et!"
+            </Text>
+            
+            <View style={styles.aiCardFeatures}>
+              <View style={[styles.aiCardFeature, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                <Ionicons name="chatbubble-ellipses" size={14} color={colors.primary || COLORS.white} />
+                <Text style={[styles.aiCardFeatureText, { color: 'rgba(255,255,255,0.6)' }]}>7/24 Sohbet</Text>
+              </View>
+              <View style={[styles.aiCardFeature, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                <Ionicons name="bulb-outline" size={14} color={colors.primary || COLORS.white} />
+                <Text style={[styles.aiCardFeatureText, { color: 'rgba(255,255,255,0.6)' }]}>Stil Öneri</Text>
+              </View>
+              <View style={[styles.aiCardFeature, { backgroundColor: 'rgba(255,255,255,0.05)' }]}>
+                <Ionicons name="business-outline" size={14} color={colors.primary || COLORS.white} />
+                <Text style={[styles.aiCardFeatureText, { color: 'rgba(255,255,255,0.6)' }]}>Marka Analizi</Text>
+              </View>
+            </View>
+            
+            <View style={[styles.aiCardButton, { backgroundColor: colors.primary || COLORS.white }]}>
+              <Text style={[styles.aiCardButtonText, { color: colors.background }]}>SOHBET BAŞLAT</Text>
+              <Ionicons name="arrow-forward" size={14} color={colors.background} />
+            </View>
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
+
+      <View style={styles.categorySection}>
+        <ScrollView 
+          horizontal 
+          showsHorizontalScrollIndicator={false}
+          style={styles.categoriesScroll}
+          contentContainerStyle={styles.categoriesContent}
+        >
+          {BRAND_CATEGORIES.map((cat) => (
+            <TouchableOpacity
+              key={cat.id}
+              style={[styles.categoryChip, selectedCategory === cat.id && styles.categoryChipActive, { borderColor: colors.border, backgroundColor: selectedCategory === cat.id ? colors.primary || colors.text : colors.surface }]}
+              onPress={() => handleCategorySelect(cat.id)}
+            >
+              <Ionicons 
+                name={cat.icon} 
+                size={12} 
+                color={selectedCategory === cat.id ? colors.background : colors.textSecondary} 
+              />
+              <Text style={[styles.categoryChipText, selectedCategory === cat.id && styles.categoryChipTextActive, { color: selectedCategory === cat.id ? colors.background : colors.text }]}>
+                {cat.label}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </View>
     </>
   );
 
+  // ============================================================
+  // 📌 RENDER
+  // ============================================================
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar barStyle="dark-content" backgroundColor={COLORS.white} />
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
       
       <View style={styles.header}>
-        <Text style={styles.logoText}>TASARIMCIM</Text>
+        <Text style={[styles.logoText, { color: colors.text }]}>TASARIMCIM</Text>
+        <View style={styles.headerActions}>
+          <TouchableOpacity style={styles.headerButton} onPress={() => setAiModalVisible(true)}>
+            <Ionicons name="color-wand-outline" size={20} color={colors.text} />
+          </TouchableOpacity>
+        </View>
       </View>
 
       <View style={styles.searchContainer}>
-        <View style={styles.searchBar}>
-          <Ionicons name="search-outline" size={16} color={COLORS.grayMedium} />
+        <View style={[styles.searchBar, { borderColor: colors.border, backgroundColor: colors.surface }]}>
+          <Ionicons name="search-outline" size={16} color={colors.textSecondary} />
           <TextInput
-            style={styles.searchInput}
-            placeholder="Tasarımcı veya marka ara..."
-            placeholderTextColor={COLORS.grayMedium}
+            style={[styles.searchInput, { color: colors.text }]}
+            placeholder="Marka ara..."
+            placeholderTextColor={colors.textSecondary}
             value={searchQuery}
-            onChangeText={(text) => {
-              setSearchQuery(text);
-              setPage(1);
-            }}
+            onChangeText={(text) => setSearchQuery(text)}
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={14} color={COLORS.grayMedium} />
+              <Ionicons name="close-circle" size={14} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
@@ -738,659 +1144,1114 @@ const TasarimcimScreen = ({ navigation }) => {
 
       <FlatList
         ref={flatListRef}
-        data={displayData}
+        data={getFilteredBrands()}
         renderItem={({ item }) => (
-          <DesignerBrandCard
+          <BrandCard
             item={item}
-            onPress={setSelectedItem}
+            onPress={() => {
+              setSelectedBrand(item);
+              setBrandPanelVisible(true);
+            }}
             onFollow={handleFollow}
+            onStyleInspire={handleStyleInspire}
             isFollowing={following.includes(item.id)}
           />
         )}
         keyExtractor={item => item.id}
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.listContent}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={COLORS.black} />}
-        onEndReached={loadMoreData}
-        onEndReachedThreshold={0.3}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={colors.text} colors={[colors.text]} />}
         ListHeaderComponent={ListHeader}
-        ListEmptyComponent={EmptyState}
-        ListFooterComponent={
-          isLoadingMore && (
-            <View style={styles.loadingMore}>
-              <ActivityIndicator size="small" color={COLORS.black} />
-              <Text style={styles.loadingMoreText}>YÜKLENİYOR...</Text>
-            </View>
-          )
-        }
+        ListEmptyComponent={() => (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="business-outline" size={48} color={colors.textSecondary} />
+            <Text style={[styles.emptyTitle, { color: colors.text }]}>MARKA BULUNAMADI</Text>
+            <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+              {searchQuery ? `"${searchQuery}" ile eşleşen marka yok` : 'Filtreleri değiştir veya yeniden dene'}
+            </Text>
+            {(searchQuery || selectedCategory !== 'all') && (
+              <TouchableOpacity 
+                style={[styles.clearButton, { borderColor: colors.border }]} 
+                onPress={() => {
+                  setSearchQuery('');
+                  setSelectedCategory('all');
+                }}
+              >
+                <Text style={[styles.clearButtonText, { color: colors.text }]}>FİLTRELERİ TEMİZLE</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
       />
 
-      <DesignerDetailModal />
+      <AIConversationModal 
+        visible={aiModalVisible}
+        onClose={() => setAiModalVisible(false)}
+      />
+
+      <BrandDetailPanel
+        visible={brandPanelVisible}
+        brand={selectedBrand}
+        onClose={() => {
+          setBrandPanelVisible(false);
+          setSelectedBrand(null);
+        }}
+        isFollowing={selectedBrand ? following.includes(selectedBrand.id) : false}
+        onFollow={handleFollow}
+      />
     </SafeAreaView>
   );
 };
 
-// ============ STILLER ============
+// ============================================================
+// 📌 STILLER
+// ============================================================
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: COLORS.white 
-  },
+  container: { flex: 1 },
   
   header: { 
-    paddingHorizontal: SIZES.lg, 
-    paddingTop: Platform.OS === 'ios' ? 12 : SIZES.md, 
-    paddingBottom: SIZES.xs 
+    paddingHorizontal: 20, 
+    paddingTop: Platform.OS === 'ios' ? 12 : 16, 
+    paddingBottom: 8,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
   },
   logoText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 16,
+    fontSize: 16, 
+    fontWeight: '600', 
     letterSpacing: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  headerActions: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  headerButton: {
+    padding: 4,
   },
   
   searchContainer: { 
-    paddingHorizontal: SIZES.lg, 
-    paddingVertical: SIZES.md 
+    paddingHorizontal: 20, 
+    paddingVertical: 8,
+    marginBottom: 4,
   },
   searchBar: { 
     flexDirection: 'row', 
     alignItems: 'center', 
     borderWidth: 0.5, 
-    borderColor: COLORS.grayLight, 
-    paddingHorizontal: SIZES.md, 
-    paddingVertical: SIZES.sm 
+    paddingHorizontal: 16, 
+    paddingVertical: 8,
+    borderRadius: 8,
   },
   searchInput: { 
     flex: 1, 
-    marginLeft: SIZES.sm, 
-    ...TYPOGRAPHY.body,
-    color: COLORS.black 
+    marginLeft: 8, 
+    fontSize: 14,
+    padding: 0,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
   
   listContent: { 
-    paddingBottom: 100 
+    paddingBottom: 100,
+    paddingHorizontal: 20,
   },
-  
-  aiCard: { 
-    marginHorizontal: SIZES.lg, 
-    marginBottom: SIZES.lg, 
-    borderWidth: 0.5, 
-    borderColor: COLORS.grayLight, 
-    overflow: 'hidden' 
+
+  // STİL KİMLİĞİ KARTLARI
+  styleIdentityContainer: {
+    marginBottom: 16,
   },
-  aiCoverImage: { 
-    width: '100%', 
-    height: 200, 
-    resizeMode: 'cover' 
+  styleIdentityHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
   },
-  aiOverlay: { 
-    ...StyleSheet.absoluteFillObject, 
-    backgroundColor: 'rgba(0,0,0,0.4)' 
+  styleIdentityTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 1,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
-  aiContent: { 
-    padding: SIZES.md 
+  styleIdentitySeeAll: {
+    fontSize: 10,
+    fontWeight: '400',
+    letterSpacing: 0.5,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
-  aiHeader: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'space-between', 
-    marginBottom: 4 
+  styleIdentityList: {
+    gap: 8,
   },
-  aiTitleContainer: {
+  styleIdentityCard: {
+    width: 160,
+    height: 200,
+    borderRadius: 12,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    marginRight: 10,
+  },
+  styleIdentityImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  styleIdentityOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    padding: 10,
+  },
+  styleIdentityContent: {
+    gap: 4,
+  },
+  styleIdentityCardTitle: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  styleIdentityStats: {
+    flexDirection: 'row',
+    gap: 12,
+  },
+  styleIdentityStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  styleIdentityStatText: {
+    fontSize: 10,
+    color: '#FFFFFF',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+
+  // KOLEKSİYONUM
+  collectionContainer: {
+    marginBottom: 16,
+  },
+  collectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  collectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    letterSpacing: 1,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  collectionSeeAll: {
+    fontSize: 10,
+    fontWeight: '400',
+    letterSpacing: 0.5,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  collectionList: {
+    gap: 8,
+  },
+  collectionItem: {
+    width: 110,
+    borderRadius: 10,
+    overflow: 'hidden',
+    borderWidth: 0.5,
+    marginRight: 10,
+  },
+  collectionItemImage: {
+    width: '100%',
+    height: 140,
+    resizeMode: 'cover',
+  },
+  collectionItemInfo: {
+    padding: 8,
+    gap: 2,
+  },
+  collectionItemName: {
+    fontSize: 11,
+    fontWeight: '500',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  collectionItemBrand: {
+    fontSize: 9,
+    fontWeight: '400',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  collectionItemPrice: {
+    fontSize: 11,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  collectionEmptyContainer: {
+    padding: 30,
+    borderRadius: 12,
+    borderWidth: 0.5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 16,
+  },
+  collectionEmptyTitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    marginTop: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  collectionEmptyText: {
+    fontSize: 10,
+    fontWeight: '400',
+    textAlign: 'center',
+    marginTop: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+
+  // PREMİUM BİLGİLENDİRME KARTI
+  premiumCard: {
+    borderRadius: 14,
+    overflow: 'hidden',
+    marginBottom: 16,
+    borderWidth: 0.5,
+  },
+  premiumCardContent: {
+    padding: 16,
+    gap: 12,
+  },
+  premiumCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  premiumCardIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(255,215,0,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  premiumCardBadge: {
+    backgroundColor: 'rgba(255,215,0,0.2)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  premiumCardBadgeText: {
+    fontSize: 8,
+    fontWeight: '700',
+    color: '#FFD700',
+    letterSpacing: 1,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  premiumCardTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  premiumCardSubtitle: {
+    fontSize: 12,
+    color: 'rgba(255,255,255,0.7)',
+    lineHeight: 18,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  premiumCardFeatures: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  premiumCardFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(255,255,255,0.05)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  premiumCardFeatureText: {
+    fontSize: 9,
+    color: 'rgba(255,255,255,0.7)',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  premiumCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    backgroundColor: 'rgba(255,255,255,0.1)',
+    paddingVertical: 10,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  premiumCardButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    letterSpacing: 1,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+
+  // AI KART
+  aiCard: {
+    marginBottom: 16,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  aiCardGradient: {
+    padding: 16,
+  },
+  aiCardContent: {
+    gap: 12,
+  },
+  aiCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  aiCardIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  aiCardBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  aiCardBadgeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  aiCardBadgeText: {
+    fontSize: 8,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  aiCardTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  aiCardSubtitle: {
+    fontSize: 13,
+    lineHeight: 20,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  aiCardFeatures: {
+    flexDirection: 'row',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  aiCardFeature: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 16,
+  },
+  aiCardFeatureText: {
+    fontSize: 9,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  aiCardButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 10,
+    marginTop: 4,
+  },
+  aiCardButtonText: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+
+  // KATEGORİLER
+  categorySection: {
+    marginBottom: 12,
+  },
+  categoriesScroll: {
+    marginBottom: 12,
+  },
+  categoriesContent: {
+    gap: 8,
+  },
+  categoryChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 0.5,
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    gap: 4,
+    borderRadius: 20,
+  },
+  categoryChipText: {
+    fontSize: 10,
+    fontWeight: '500',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  categoryChipActive: {
+    borderWidth: 1,
+  },
+  categoryChipTextActive: {
+    fontWeight: '600',
+  },
+
+  // MARKA KARTI
+  brandCard: {
+    borderWidth: 0.5,
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 16,
+  },
+  brandCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+  },
+  brandAvatar: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 0.5,
+  },
+  brandInfo: {
+    flex: 1,
+  },
+  brandNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    flexWrap: 'wrap',
+  },
+  brandName: {
+    fontSize: 15,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  brandTrendBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  brandTrendText: {
+    fontSize: 8,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  brandCategory: {
+    fontSize: 10,
+    marginBottom: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  brandStats: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 8,
   },
-  aiTitle: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 11,
-    color: COLORS.white 
+  brandStat: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
   },
-  aiBadge: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
+  brandStatText: {
+    fontSize: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  brandStatDivider: {
+    width: 1,
+    height: 12,
+  },
+  followButton: {
     borderWidth: 0.5,
-    borderColor: COLORS.white,
-    paddingHorizontal: SIZES.xs, 
-    paddingVertical: 2, 
-    gap: 2 
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: 4,
   },
-  aiBadgeText: { 
-    ...TYPOGRAPHY.caption,
+  followButtonActive: {
+    borderWidth: 1,
+  },
+  followButtonText: {
+    fontSize: 9,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  followButtonTextActive: {
+    fontWeight: '700',
+  },
+
+  // AVANTAJLAR
+  brandAdvantages: {
+    marginTop: 8,
+    paddingTop: 8,
+    borderTopWidth: 0.5,
+  },
+  advantageChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 0.5,
+    marginRight: 6,
+  },
+  advantageText: {
     fontSize: 8,
-    color: COLORS.white 
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
-  aiArrowContainer: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+  privilegeChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 12,
+    borderWidth: 0.5,
+    marginRight: 6,
+  },
+  privilegeText: {
+    fontSize: 8,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+
+  // STİL İLHAMI
+  styleInspireButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 6,
+    marginTop: 8,
+    borderWidth: 0.5,
+    borderRadius: 8,
+  },
+  styleInspireText: {
+    fontSize: 10,
+    fontWeight: '500',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+
+  // MARKA PANEL
+  panelContainer: {
+    flex: 1,
+  },
+  panelHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 0.5,
+  },
+  panelBackButton: {
+    padding: 4,
+  },
+  panelTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelHeaderRight: {
+    width: 32,
+  },
+  panelCover: {
+    width: '100%',
+    height: 180,
+    resizeMode: 'cover',
+  },
+  panelContent: {
+    padding: 16,
+  },
+  panelProfileSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    marginBottom: 16,
+    marginTop: -40,
+  },
+  panelAvatar: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    borderWidth: 2,
+  },
+  panelProfileInfo: {
+    flex: 1,
+  },
+  panelBrandName: {
+    fontSize: 20,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelBrandTitle: {
+    fontSize: 13,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelBrandLocation: {
+    fontSize: 11,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelStats: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    borderWidth: 0.5,
+    padding: 16,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  panelStat: {
+    alignItems: 'center',
+    flex: 1,
+  },
+  panelStatNumber: {
+    fontSize: 18,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelStatLabel: {
+    fontSize: 9,
+    marginTop: 2,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelStatDivider: {
+    width: 0.5,
+  },
+  panelSectionTitle: {
+    fontSize: 11,
+    fontWeight: '600',
+    letterSpacing: 1,
+    marginBottom: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelCampaigns: {
+    marginBottom: 16,
+  },
+  panelCampaign: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    borderWidth: 0.5,
+    padding: 12,
+    borderRadius: 8,
+    marginBottom: 8,
+  },
+  panelCampaignInfo: {
+    flex: 1,
+  },
+  panelCampaignTitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelCampaignDate: {
+    fontSize: 9,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelAnalytics: {
+    marginBottom: 16,
+  },
+  panelAnalyticsGrid: {
+    flexDirection: 'row',
+    borderWidth: 0.5,
+    borderRadius: 8,
+    overflow: 'hidden',
+  },
+  panelAnalyticsItem: {
+    flex: 1,
+    padding: 12,
+    alignItems: 'center',
+    borderRightWidth: 0.5,
+  },
+  panelAnalyticsNumber: {
+    fontSize: 20,
+    fontWeight: '700',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelAnalyticsLabel: {
+    fontSize: 9,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelTabs: {
+    flexDirection: 'row',
+    borderWidth: 0.5,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginBottom: 16,
+  },
+  panelTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  panelTabActive: {
+    borderWidth: 1,
+  },
+  panelTabText: {
+    fontSize: 10,
+    fontWeight: '500',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelTabTextActive: {
+    fontWeight: '700',
+  },
+  panelTabContent: {
+    gap: 16,
+  },
+  panelDescription: {
+    fontSize: 13,
+    lineHeight: 20,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelSubTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    marginBottom: 8,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelAdvantagesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  panelAdvantageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+    borderWidth: 0.5,
+  },
+  panelAdvantageText: {
+    fontSize: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelPrivilegesGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  panelPrivilegeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 12,
+  },
+  panelPrivilegeText: {
+    fontSize: 10,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelDesigns: {
+    gap: 8,
+  },
+  panelDesignItem: {
+    width: 140,
+    borderWidth: 0.5,
+    borderRadius: 8,
+    overflow: 'hidden',
+    marginRight: 8,
+  },
+  panelDesignImage: {
+    width: 140,
+    height: 120,
+    resizeMode: 'cover',
+  },
+  panelDesignTitle: {
+    fontSize: 10,
+    padding: 4,
+    textAlign: 'center',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelDesignStats: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingBottom: 4,
+  },
+  panelDesignStatText: {
+    fontSize: 9,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelPersonalTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    marginBottom: 12,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelPersonalCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    padding: 16,
+    borderWidth: 0.5,
+    borderRadius: 12,
+    marginBottom: 16,
+  },
+  panelPersonalInfo: {
+    flex: 1,
+  },
+  panelPersonalText: {
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelPersonalSubText: {
+    fontSize: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelPersonalRecommendations: {
+    gap: 12,
+  },
+  panelPersonalRecItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 16,
+    padding: 12,
+    borderWidth: 0.5,
+    borderRadius: 12,
+  },
+  panelPersonalRecImage: {
+    width: 60,
+    height: 60,
+    borderRadius: 8,
+  },
+  panelPersonalRecInfo: {
+    flex: 1,
+  },
+  panelPersonalRecTitle: {
+    fontSize: 13,
+    fontWeight: '500',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelPersonalRecDesc: {
+    fontSize: 10,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelPersonalRecButton: {
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: 4,
+  },
+  panelPersonalRecButtonText: {
+    fontSize: 9,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelFooter: {
+    flexDirection: 'row',
+    gap: 16,
+    padding: 16,
+    borderTopWidth: 0.5,
+  },
+  panelFollowButton: {
+    flex: 1,
+    borderWidth: 0.5,
+    paddingVertical: 14,
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  panelFollowButtonActive: {
+    borderWidth: 1,
+  },
+  panelFollowText: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  panelFollowTextActive: {
+    fontWeight: '700',
+  },
+  panelInspireButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 14,
+    borderRadius: 8,
+  },
+  panelInspireText: {
+    fontSize: 12,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+
+  // EMPTY STATE
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingTop: 32,
+    minHeight: 300,
+  },
+  emptyTitle: {
+    marginTop: 16,
+    marginBottom: 4,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  emptyText: {
+    fontSize: 9,
+    textAlign: 'center',
+    marginBottom: 16,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  clearButton: {
+    borderWidth: 0.5,
+    paddingHorizontal: 32,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  clearButtonText: {
+    fontSize: 9,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+
+  // AI MODAL
+  modalContainer: {
+    flex: 1,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    borderBottomWidth: 0.5,
+  },
+  modalBackButton: {
+    padding: 4,
+  },
+  modalHeaderCenter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  modalHeaderAvatar: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalHeaderTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  modalHeaderStatus: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  modalHeaderStatusText: {
+    fontSize: 9,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  modalResetButton: {
+    padding: 4,
+  },
+  messagesList: {
+    paddingHorizontal: 16,
+    paddingVertical: 16,
+    flexGrow: 1,
+  },
+  messageWrapper: {
+    flexDirection: 'row',
+    marginBottom: 12,
+    maxWidth: '85%',
+  },
+  aiMessageWrapper: {
+    alignSelf: 'flex-start',
+  },
+  userMessageWrapper: {
+    alignSelf: 'flex-end',
+  },
+  aiAvatarContainer: {
+    marginRight: 8,
+    alignSelf: 'flex-end',
+  },
+  aiAvatar: {
     width: 28,
     height: 28,
     borderRadius: 14,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  aiSlogan: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.white, 
-    opacity: 0.8, 
-    marginBottom: SIZES.md, 
-    fontStyle: 'italic' 
+  messageBubble: {
+    padding: 12,
+    borderRadius: 12,
+    maxWidth: '100%',
   },
-  aiStatsGrid: { 
-    flexDirection: 'row', 
-    flexWrap: 'wrap', 
-    gap: SIZES.sm, 
-    marginBottom: SIZES.md 
+  aiBubble: {
+    borderTopLeftRadius: 4,
   },
-  aiStatCard: { 
-    flex: 1, 
-    minWidth: '22%', 
+  userBubble: {
+    borderTopRightRadius: 4,
+  },
+  messageText: {
+    fontSize: 13,
+    lineHeight: 20,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  messageTime: {
+    fontSize: 8,
+    marginTop: 4,
+    alignSelf: 'flex-end',
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderTopWidth: 0.5,
+    gap: 8,
+  },
+  input: {
+    flex: 1,
+    fontSize: 14,
+    maxHeight: 100,
+    padding: 10,
     borderWidth: 0.5,
-    borderColor: 'rgba(255,255,255,0.3)',
-    padding: SIZES.xs, 
-    alignItems: 'center' 
+    borderRadius: 8,
+    minHeight: 40,
+    fontFamily: Platform.OS === 'ios' ? 'Georgia' : 'serif',
   },
-  aiStatIconBg: { 
-    width: 28, 
-    height: 28, 
-    backgroundColor: COLORS.white, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    marginBottom: 2 
-  },
-  aiStatNumber: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 10,
-    color: COLORS.white, 
-    marginBottom: 2 
-  },
-  aiStatLabel: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 7,
-    color: COLORS.white, 
-    opacity: 0.7 
-  },
-  aiButton: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    backgroundColor: COLORS.cognac,
-    paddingVertical: SIZES.sm, 
-    gap: 4,
+  sendButton: {
+    width: 40,
+    height: 40,
     borderRadius: 20,
-  },
-  aiButtonText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.white 
-  },
-  
-  tabContainer: { 
-    flexDirection: 'row', 
-    marginHorizontal: SIZES.lg, 
-    marginBottom: SIZES.md, 
-    borderWidth: 0.5, 
-    borderColor: COLORS.grayLight 
-  },
-  tabButton: { 
-    flex: 1, 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    justifyContent: 'center', 
-    paddingVertical: SIZES.sm, 
-    gap: 4, 
-    backgroundColor: COLORS.white 
-  },
-  tabButtonActive: { 
-    backgroundColor: COLORS.black 
-  },
-  tabButtonText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 10,
-    color: COLORS.grayMedium 
-  },
-  tabButtonTextActive: { 
-    color: COLORS.white 
-  },
-  
-  categoriesScroll: { 
-    marginBottom: SIZES.md 
-  },
-  categoriesContent: { 
-    paddingHorizontal: SIZES.lg, 
-    gap: SIZES.sm 
-  },
-  categoryChip: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    borderWidth: 0.5, 
-    borderColor: COLORS.grayLight, 
-    paddingHorizontal: SIZES.md, 
-    paddingVertical: 4, 
-    gap: 4 
-  },
-  categoryChipActive: { 
-    backgroundColor: COLORS.black,
-    borderColor: COLORS.black,
-  },
-  categoryChipText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.grayMedium 
-  },
-  categoryChipTextActive: { 
-    color: COLORS.white 
-  },
-  
-  trendingSection: { 
-    marginBottom: SIZES.lg 
-  },
-  trendingHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    paddingHorizontal: SIZES.lg, 
-    marginBottom: SIZES.md 
-  },
-  trendingTitle: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 10,
-  },
-  trendingScroll: { 
-    paddingLeft: SIZES.lg 
-  },
-  trendingCard: { 
-    width: 110, 
-    borderWidth: 0.5, 
-    borderColor: COLORS.grayLight, 
-    padding: SIZES.sm, 
-    marginRight: SIZES.sm, 
-    alignItems: 'center' 
-  },
-  trendingAvatar: { 
-    width: 48, 
-    height: 48, 
-    borderWidth: 0.5,
-    borderColor: COLORS.grayLight,
-    marginBottom: 4 
-  },
-  trendingName: { 
-    ...TYPOGRAPHY.bodySmall,
-    fontWeight: '500', 
-    marginBottom: 2, 
-    textAlign: 'center' 
-  },
-  trendingTitleText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 8,
-    color: COLORS.grayMedium, 
-    marginBottom: 4, 
-    textAlign: 'center' 
-  },
-  trendingTrend: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 2, 
-    marginBottom: 4 
-  },
-  trendingPercent: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 8,
-    color: COLORS.grayMedium 
-  },
-  trendingFollowBtn: { 
-    borderWidth: 0.5, 
-    borderColor: COLORS.grayLight, 
-    paddingHorizontal: SIZES.sm, 
-    paddingVertical: 2 
-  },
-  trendingFollowBtnActive: { 
-    backgroundColor: COLORS.black,
-    borderColor: COLORS.black,
-  },
-  trendingFollowBtnText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 7,
-    color: COLORS.black 
-  },
-  trendingFollowBtnTextActive: { 
-    color: COLORS.white 
-  },
-  
-  designerCard: { 
-    marginHorizontal: SIZES.lg, 
-    marginBottom: SIZES.md, 
-    borderWidth: 0.5, 
-    borderColor: COLORS.grayLight, 
-  },
-  cardHeader: { 
-    flexDirection: 'row', 
-    padding: SIZES.md, 
-    gap: SIZES.md 
-  },
-  cardAvatar: { 
-    width: 48, 
-    height: 48, 
-    borderWidth: 0.5,
-    borderColor: COLORS.grayLight,
-    backgroundColor: COLORS.surface 
-  },
-  cardUserInfo: { 
-    flex: 1 
-  },
-  cardNameRow: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    flexWrap: 'wrap', 
-    gap: 4, 
-    marginBottom: 2 
-  },
-  cardName: { 
-    ...TYPOGRAPHY.body,
-    fontWeight: '500', 
-  },
-  cardTypeBadge: { 
-    borderWidth: 0.5, 
-    borderColor: COLORS.grayLight, 
-    paddingHorizontal: 4, 
-    paddingVertical: 1 
-  },
-  cardTypeBadgeText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 7,
-    color: COLORS.grayMedium 
-  },
-  cardTitle: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.grayMedium, 
-    marginBottom: 4 
-  },
-  cardStats: { 
-    flexDirection: 'row', 
-    gap: SIZES.md 
-  },
-  cardStat: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 2 
-  },
-  cardStatText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 8,
-    color: COLORS.grayMedium 
-  },
-  followButton: { 
-    borderWidth: 0.5, 
-    borderColor: COLORS.grayLight, 
-    paddingHorizontal: SIZES.md, 
-    paddingVertical: 4, 
-    alignSelf: 'flex-start' 
-  },
-  followButtonActive: { 
-    backgroundColor: COLORS.black,
-    borderColor: COLORS.black,
-  },
-  followButtonText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.black 
-  },
-  followButtonTextActive: { 
-    color: COLORS.white 
-  },
-  
-  designsSection: { 
-    paddingHorizontal: SIZES.md, 
-    paddingBottom: SIZES.md 
-  },
-  designsHeader: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-between', 
-    alignItems: 'center', 
-    marginBottom: SIZES.sm 
-  },
-  designsTitle: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-  },
-  designsSeeAll: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 8,
-    color: COLORS.grayMedium 
-  },
-  designsScroll: { 
-    flexDirection: 'row' 
-  },
-  designCard: { 
-    width: 120, 
-    borderWidth: 0.5, 
-    borderColor: COLORS.grayLight, 
-    overflow: 'hidden', 
-    marginRight: SIZES.sm, 
-    backgroundColor: COLORS.surface 
-  },
-  designImage: { 
-    width: 120, 
-    height: 100, 
-    resizeMode: 'cover' 
-  },
-  designOverlay: { 
-    position: 'absolute', 
-    bottom: 0, 
-    left: 0, 
-    right: 0, 
-    backgroundColor: 'rgba(0,0,0,0.6)', 
-    padding: 4 
-  },
-  designTitle: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 8,
-    color: COLORS.white, 
-    marginBottom: 2 
-  },
-  designStats: { 
-    flexDirection: 'row', 
-    gap: SIZES.sm 
-  },
-  designStat: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    gap: 2 
-  },
-  designStatText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 7,
-    color: COLORS.white 
-  },
-  
-  emptyContainer: { 
-    flex: 1, 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    paddingTop: SIZES.xl, 
-    minHeight: 300 
-  },
-  emptyIconContainer: {
-    width: 80,
-    height: 80,
-    borderWidth: 0.5,
-    borderColor: COLORS.grayLight,
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: SIZES.lg,
   },
-  emptyTitle: { 
-    ...TYPOGRAPHY.caption,
-    marginTop: SIZES.sm, 
-    marginBottom: 4 
-  },
-  emptyText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.grayMedium, 
-    textAlign: 'center', 
-    marginBottom: SIZES.lg 
-  },
-  clearButton: { 
-    borderWidth: 0.5, 
-    borderColor: COLORS.grayLight,
-    paddingHorizontal: SIZES.xl, 
-    paddingVertical: SIZES.sm 
-  },
-  clearButtonText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.black 
-  },
-  
-  loadingMore: { 
-    flexDirection: 'row', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    paddingVertical: SIZES.lg, 
-    gap: SIZES.sm 
-  },
-  loadingMoreText: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.grayMedium 
-  },
-  
-  modalOverlay: { 
-    flex: 1, 
-    backgroundColor: 'rgba(0,0,0,0.8)' 
-  },
-  modalContainer: { 
-    flex: 1, 
-    backgroundColor: COLORS.white, 
-    marginTop: 60, 
-    overflow: 'hidden' 
-  },
-  modalHeader: { 
-    position: 'relative' 
-  },
-  modalCover: { 
-    width: '100%', 
-    height: 180 
-  },
-  closeButton: { 
-    position: 'absolute', 
-    top: SIZES.lg, 
-    right: SIZES.lg, 
-    backgroundColor: COLORS.black, 
-    width: 32, 
-    height: 32, 
-    justifyContent: 'center', 
-    alignItems: 'center' 
-  },
-  modalProfile: { 
-    position: 'absolute', 
-    bottom: -24, 
-    left: SIZES.lg, 
-    flexDirection: 'row', 
-    alignItems: 'center' 
-  },
-  modalAvatar: { 
-    width: 64, 
-    height: 64, 
-    borderWidth: 2, 
-    borderColor: COLORS.white 
-  },
-  modalProfileInfo: { 
-    marginLeft: SIZES.md, 
-    backgroundColor: 'rgba(0,0,0,0.7)', 
-    padding: SIZES.sm, 
-    maxWidth: width * 0.6 
-  },
-  modalName: { 
-    ...TYPOGRAPHY.body,
-    fontWeight: '500',
-    color: COLORS.white, 
-    marginBottom: 2 
-  },
-  modalTitle: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    color: COLORS.grayLight 
-  },
-  modalContent: { 
-    padding: SIZES.lg, 
-    paddingTop: SIZES.xl 
-  },
-  modalDescription: { 
-    ...TYPOGRAPHY.bodySmall,
-    lineHeight: 18, 
-    marginBottom: SIZES.lg 
-  },
-  modalStats: { 
-    flexDirection: 'row', 
-    justifyContent: 'space-around', 
-    borderWidth: 0.5, 
-    borderColor: COLORS.grayLight, 
-    padding: SIZES.md, 
-    marginBottom: SIZES.lg 
-  },
-  modalStat: { 
-    alignItems: 'center', 
-    flex: 1 
-  },
-  modalStatNumber: { 
-    ...TYPOGRAPHY.body,
-    fontWeight: '500',
-  },
-  modalStatLabel: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 8,
-    color: COLORS.grayMedium, 
-    marginTop: 2 
-  },
-  modalStatDivider: { 
-    width: 0.5, 
-    backgroundColor: COLORS.grayLight 
-  },
-  modalDesignsSection: { 
-    marginBottom: SIZES.lg 
-  },
-  modalDesignsTitle: { 
-    ...TYPOGRAPHY.caption,
-    marginBottom: SIZES.md 
-  },
-  modalDesignCard: { 
-    marginRight: SIZES.md, 
-    borderWidth: 0.5, 
-    borderColor: COLORS.grayLight, 
-    overflow: 'hidden', 
-    backgroundColor: COLORS.surface 
-  },
-  modalDesignImage: { 
-    width: 120, 
-    height: 140, 
-    resizeMode: 'cover' 
-  },
-  modalDesignTitle: { 
-    ...TYPOGRAPHY.caption,
-    fontSize: 9,
-    padding: 4, 
-    textAlign: 'center' 
-  },
-  modalFollowButton: { 
-    borderWidth: 0.5, 
-    borderColor: COLORS.grayLight,
-    paddingVertical: SIZES.md, 
-    alignItems: 'center', 
-    marginTop: SIZES.sm 
-  },
-  modalFollowButtonActive: { 
-    backgroundColor: COLORS.black,
-    borderColor: COLORS.black,
-  },
-  modalFollowText: { 
-    ...TYPOGRAPHY.button,
-    color: COLORS.black 
-  },
-  modalFollowTextActive: { 
-    color: COLORS.white 
+  sendButtonDisabled: {
+    opacity: 0.5,
   },
 });
 
