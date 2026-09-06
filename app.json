@@ -1,6 +1,5 @@
 {
   "expo": {
-<<<<<<< HEAD
     "name": "ModaVerse AI",
     "slug": "modaverse",
     "version": "1.1.0",
@@ -54,23 +53,3 @@
     }
   }
 }
-=======
-    "name": "ModaVerse",
-    "slug": "ModaVerse",
-    "version": "1.0.0",
-    "orientation": "portrait",
-    "userInterfaceStyle": "light",
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "android": {
-      "package": "com.anonymous.ModaVerse"
-    },
-    "extra": {
-      "eas": {
-        "projectId": "e387e891-37bd-4b12-9955-b6ab366b103b"
-      }
-    }
-  }
-}
->>>>>>> f2809f7794fbdc479fe98df677c0a0bf2aa7fd3e
