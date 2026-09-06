@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 // 📁 App.js - REVİZE (CustomToast Entegrasyonlu)
 
 import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
@@ -745,4 +746,14 @@ export default function App() {
       </AuthContext.Provider>
     </ThemeContext.Provider>
   );
+=======
+import { Text, View } from 'react-native';
+
+export default function App() {
+  return (
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
+      <Text style={{ fontSize: 24 }}>ModaVerse Çalışıyor! 🎉</Text>
+    </View>
+  );
+>>>>>>> f2809f7794fbdc479fe98df677c0a0bf2aa7fd3e
 }

@@ -44,7 +44,11 @@ if (getRNMinorVersion() >= 75) {
   }
 }
 
+<<<<<<< HEAD
 rootProject.name = 'ModaVerse AI'
+=======
+rootProject.name = 'ModaVerse'
+>>>>>>> f2809f7794fbdc479fe98df677c0a0bf2aa7fd3e
 
 dependencyResolutionManagement {
   versionCatalogs {

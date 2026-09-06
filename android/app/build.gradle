@@ -109,6 +109,7 @@ android {
     buildToolsVersion rootProject.ext.buildToolsVersion
     compileSdk rootProject.ext.compileSdkVersion
 
+<<<<<<< HEAD
     namespace 'com.modaverse.app'
     defaultConfig {
         applicationId 'com.modaverse.app'
@@ -116,6 +117,15 @@ android {
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1
         versionName "1.1.0"
+=======
+    namespace 'com.anonymous.ModaVerse'
+    defaultConfig {
+        applicationId 'com.anonymous.ModaVerse'
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0.0"
+>>>>>>> f2809f7794fbdc479fe98df677c0a0bf2aa7fd3e
     }
     signingConfigs {
         debug {
